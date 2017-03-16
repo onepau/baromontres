@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+{% extends "base.html" %}
+{% block content %}
+
+
+<html lang="en">
+<head>
+   <meta charset="utf-8" />
+   <title>Baromontres</title>
+ 
+   <!-- import plugin script -->
+   <script src='static/Chart.min.js'></script>
+ 
+</head>
+<body>
+ 
+<h1>Baromontres</h1>
+<p>Le prix en francs suisses d'un article acheté à l'unité sur le site d'actualité horlogère francophone indépendante.</p>
+<div><p>Période: du {{ start_date }} au {{ end_date }}</div></p>
+<div><p>Prix moyen pour cette période: {{ average_price }}</div></p>
+<!-- bar chart canvas element -->
+<canvas id="chart" width="1024" height="400"></canvas>
+ 
+<script>
+ 
+   // bar chart data
+   var barData = {
+   labels : [{% for item in labels %}
+                  "",
+              {% endfor %}],
+   datasets : [
+      {
+            fillColor: "rgba(151,187,205,0.2)",
+            strokeColor: "rgba(151,187,205,1)",
+            pointColor: "rgba(151,187,205,1)",
+            pointStrokeColor: "#fff",
+            pointHighlightFill: "#fff",
+            pointHighlightStroke: "rgba(151,187,205,1)",
+            pointradius: 1,
+            pointhoverRadius: 1,
+            pointhitRadius : 0,
+            bezierCurve : false,
+            data : [{% for item in values %}
+                      {{item}},
+                    {% endfor %}]
+      }]
+   }
+ 
+    Chart.defaults.global.animationSteps = 50;
+    Chart.defaults.global.tooltipYPadding = 3;
+    Chart.defaults.global.tooltipCornerRadius = 1;
+    Chart.defaults.global.tooltipTitleFontStyle = "normal";
+    Chart.defaults.global.tooltipFillColor = "rgba(0,0,0,0.8)"; 
+    Chart.defaults.global.animationEasing = "easeOutBounce";
+    Chart.defaults.global.responsive = false;
+    Chart.defaults.global.scaleLineColor = "black";
+    Chart.defaults.global.scaleFontSize = 16;
+
+  
+   // get bar chart canvas
+   var mychart = document.getElementById("chart").getContext("2d");
+ 
+   steps = 1
+   max = 3
+   // draw line chart
+   var LineChartDemo = new Chart(mychart).Line(barData, {
+        scaleOverride: false,
+        scaleSteps: steps,
+        scaleStepWidth: Math.ceil(max / steps),
+        scaleStartValue: 2,
+        scaleShowVerticalLines: false,
+        scaleShowGridLines : false,
+        barShowStroke : false,
+        scaleShowLabels: true,
+        bezierCurve: true,
+       });
+ 
+ 
+</script>
+
+{% endblock %}
+ 
+</body>
+</html>
