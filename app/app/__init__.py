@@ -7,6 +7,8 @@ from config import basedir
 
 
 app = Flask(__name__)
+
+import app.views
 lm = LoginManager()
 lm.init_app(app)
 lm.login_view = 'login'
