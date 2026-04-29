@@ -1,0 +1,23 @@
+{
+  "tagline": "Baromètre de prix et d'humeur de la presse horlogère francophone.",
+  "period": "Période",
+  "averagePrice": "Prix moyen (CHF)",
+  "articleCount": "Articles",
+  "subscription": "Abonnement",
+  "positive": "Positif",
+  "neutral": "Neutre",
+  "negative": "Négatif",
+  "unknown": "Non analysé",
+  "brandsTitle": "Marques mentionnées",
+  "topicsTitle": "Sujets récurrents",
+  "imageFlagsTitle": "Images détournées et générées par IA",
+  "imageFlagsHint": "Articles signalés pour utilisation d'images de bandes dessinées ou suspectées d'être générées par IA.",
+  "dataSource": "Données scrapées depuis",
+  "tooltipPrice": "Prix",
+  "tooltipDate": "Publié le",
+  "tooltipReadOn": "Lire sur businessmontres.com",
+  "paywall": "payant",
+  "free": "gratuit",
+  "noData": "Aucune donnée pour le moment.",
+  "adPlaceholder": "Espace publicitaire"
+}

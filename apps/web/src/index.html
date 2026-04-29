@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Baromontres</title>
+    <meta
+      name="description"
+      content="Baromètre de prix et d'humeur des articles de businessmontres.com"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">
+        <h1>Baromontres</h1>
+        <p class="tagline" data-i18n="tagline"></p>
+      </div>
+      <nav class="lang-switch" aria-label="Language">
+        <button data-lang="fr" aria-pressed="true">FR</button>
+        <button data-lang="en" aria-pressed="false">EN</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="chart-section">
+        <div class="chart-meta">
+          <div>
+            <span class="meta-label" data-i18n="period"></span>
+            <strong id="meta-period">…</strong>
+          </div>
+          <div>
+            <span class="meta-label" data-i18n="averagePrice"></span>
+            <strong id="meta-average">…</strong>
+          </div>
+          <div>
+            <span class="meta-label" data-i18n="articleCount"></span>
+            <strong id="meta-count">…</strong>
+          </div>
+          <div>
+            <span class="meta-label" data-i18n="subscription"></span>
+            <strong id="meta-subscription">—</strong>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="barometer" width="1024" height="420" aria-label="price barometer"></canvas>
+          <div id="tooltip" class="tooltip" hidden></div>
+        </div>
+        <ul class="legend" aria-label="sentiment legend">
+          <li><span class="dot dot-positive"></span><span data-i18n="positive"></span></li>
+          <li><span class="dot dot-neutral"></span><span data-i18n="neutral"></span></li>
+          <li><span class="dot dot-negative"></span><span data-i18n="negative"></span></li>
+          <li><span class="dot dot-unknown"></span><span data-i18n="unknown"></span></li>
+        </ul>
+      </section>
+
+      <!--
+        Google AdSense placeholder. Replace data-ad-client / data-ad-slot
+        with real values, then uncomment the script tag in index.html
+        <head> to enable. The .ad-slot CSS reserves space so the page
+        does not shift when ads load.
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+      -->
+      <aside id="ad-slot-home" class="ad-slot" aria-label="advertisement">
+        <ins
+          class="adsbygoogle"
+          style="display:block"
+          data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+          data-ad-slot="XXXXXXXXXX"
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        ></ins>
+        <span class="ad-placeholder" data-i18n="adPlaceholder"></span>
+      </aside>
+
+      <section class="topics">
+        <h2 data-i18n="brandsTitle"></h2>
+        <div id="brands" class="chips"></div>
+        <h2 data-i18n="topicsTitle"></h2>
+        <div id="topics" class="chips"></div>
+      </section>
+
+      <section class="image-flags">
+        <h2 data-i18n="imageFlagsTitle"></h2>
+        <p class="hint" data-i18n="imageFlagsHint"></p>
+        <ul id="image-flags-list" class="flag-list"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        <span data-i18n="dataSource"></span>
+        <a href="https://www.businessmontres.com" rel="noopener">businessmontres.com</a>
+      </p>
+    </footer>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

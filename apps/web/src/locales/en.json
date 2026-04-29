@@ -1,0 +1,23 @@
+{
+  "tagline": "Price and mood barometer of the French-language watch press.",
+  "period": "Period",
+  "averagePrice": "Average price (CHF)",
+  "articleCount": "Articles",
+  "subscription": "Subscription",
+  "positive": "Positive",
+  "neutral": "Neutral",
+  "negative": "Negative",
+  "unknown": "Not analysed",
+  "brandsTitle": "Brands mentioned",
+  "topicsTitle": "Recurring topics",
+  "imageFlagsTitle": "Doctored and AI-generated images",
+  "imageFlagsHint": "Articles flagged for using comic-book imagery or suspected of being AI-generated.",
+  "dataSource": "Data scraped from",
+  "tooltipPrice": "Price",
+  "tooltipDate": "Published on",
+  "tooltipReadOn": "Read on businessmontres.com",
+  "paywall": "paywall",
+  "free": "free",
+  "noData": "No data yet.",
+  "adPlaceholder": "Advertisement"
+}
