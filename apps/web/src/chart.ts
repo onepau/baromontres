@@ -15,12 +15,19 @@ import { getLang, t } from './i18n.ts';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, TimeScale, Tooltip, Filler);
 
-const SENTIMENT_COLOR: Record<string, string> = {
+const SENTIMENT_COLOR = {
   positive: '#2f9e44',
   neutral: '#f0b400',
   negative: '#e03131',
-};
+} as const;
 const UNKNOWN_COLOR = '#b0a89c';
+
+function sentimentColor(label: string | null | undefined): string {
+  if (label === 'positive' || label === 'neutral' || label === 'negative') {
+    return SENTIMENT_COLOR[label];
+  }
+  return UNKNOWN_COLOR;
+}
 
 export function renderBarometer(
   canvas: HTMLCanvasElement,
@@ -34,14 +41,12 @@ export function renderBarometer(
   }
 
   const data = points.map((p) => ({
-    x: p.published_at,
+    x: new Date(p.published_at).getTime(),
     y: p.unit_price_chf,
     point: p,
   }));
 
-  const colors = points.map((p) =>
-    p.sentiment_label ? SENTIMENT_COLOR[p.sentiment_label] ?? UNKNOWN_COLOR : UNKNOWN_COLOR,
-  );
+  const colors = points.map((p) => sentimentColor(p.sentiment_label));
 
   const datasets: ChartConfiguration<'line'>['data']['datasets'] = [
     {
@@ -53,6 +58,8 @@ export function renderBarometer(
       pointHoverRadius: 7,
       pointBackgroundColor: colors,
       pointBorderColor: colors,
+      backgroundColor: colors,
+      borderColor: colors,
     },
   ];
 
