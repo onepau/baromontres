@@ -7,28 +7,36 @@ export async function discoverArticleUrls(
   sourceBase: string,
   userAgent: string,
   limit: number,
+  maxPages = 3,
 ): Promise<string[]> {
   const seen = new Set<string>();
-  const pagesToTry = [sourceBase, `${sourceBase}/page/2`, `${sourceBase}/page/3`];
-  for (const page of pagesToTry) {
+  for (let n = 1; n <= maxPages; n++) {
     if (seen.size >= limit) break;
+    const page = n === 1 ? sourceBase : `${sourceBase}/page/${n}`;
+    if (n > 1) await sleep(700);
+    let html: string;
     try {
-      const html = await fetchText(page, userAgent);
-      const { document } = parseHTML(html);
-      const anchors = document.querySelectorAll('a[href]');
-      for (const a of Array.from(anchors)) {
-        const href = (a as Element).getAttribute('href');
-        if (!href) continue;
-        if (!ARTICLE_HREF.test(href)) continue;
-        const normalized = normalizeUrl(href);
-        seen.add(normalized);
-        if (seen.size >= limit) break;
-      }
+      html = await fetchText(page, userAgent);
     } catch {
-      // ignore listing fetch errors; partial discovery is fine
+      // 404 on /page/N is the natural end of pagination; stop.
+      break;
     }
+    const before = seen.size;
+    const { document } = parseHTML(html);
+    for (const a of Array.from(document.querySelectorAll('a[href]'))) {
+      const href = (a as Element).getAttribute('href');
+      if (!href) continue;
+      if (!ARTICLE_HREF.test(href)) continue;
+      seen.add(normalizeUrl(href));
+      if (seen.size >= limit) break;
+    }
+    if (n > 1 && seen.size === before) break;
   }
   return [...seen];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export async function fetchAndParse(

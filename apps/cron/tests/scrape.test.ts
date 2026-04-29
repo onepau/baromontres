@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArticleHtml, parseFrenchDate, parsePriceText } from '../src/scrape.ts';
+import {
+  discoverArticleUrls,
+  parseArticleHtml,
+  parseFrenchDate,
+  parsePriceText,
+} from '../src/scrape.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
@@ -57,5 +62,54 @@ describe('parseArticleHtml', () => {
     expect(a!.unit_price_chf).toBeNull();
     expect(a!.full_text).toContain('salon ouvre');
     expect(a!.full_text).toContain('marques indépendantes');
+  });
+});
+
+describe('discoverArticleUrls', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function pageHtml(slugs: string[]): string {
+    const links = slugs
+      .map((s) => `<a href="https://www.businessmontres.com/article/${s}">x</a>`)
+      .join('');
+    return `<html><body>${links}</body></html>`;
+  }
+
+  it('stops early when a page yields no new URLs', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.endsWith('/page/2')) return new Response(pageHtml(['a', 'b']));
+      if (url.endsWith('/page/3')) return new Response(pageHtml(['a', 'b']));
+      return new Response(pageHtml(['a', 'b']));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const urls = await discoverArticleUrls(
+      'https://www.businessmontres.com',
+      'test',
+      100,
+      10,
+    );
+    expect(urls).toHaveLength(2);
+    // page 1 + page 2 (zero new → stop). page 3 should never be requested.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops on a 404 listing page', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.endsWith('/page/2')) return new Response('not found', { status: 404 });
+      return new Response(pageHtml(['a', 'b']));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const urls = await discoverArticleUrls(
+      'https://www.businessmontres.com',
+      'test',
+      100,
+      10,
+    );
+    expect(urls).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

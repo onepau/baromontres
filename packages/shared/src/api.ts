@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import {
   getArticleDetail,
   getBarometer,
+  getFlaggedImages,
   getKeywordFrequencies,
   latestSubscriptionPrice,
 } from './queries.ts';
@@ -44,13 +45,24 @@ export function createApi(): Hono<{ Bindings: Env }> {
   app.get('/api/keywords', async (c) => {
     const kindParam = c.req.query('kind');
     const limitParam = c.req.query('limit');
+    const minCountParam = c.req.query('min_count');
     const kind =
       kindParam && KEYWORD_KINDS.has(kindParam as KeywordKind)
         ? (kindParam as KeywordKind)
         : undefined;
     const limit = limitParam ? Math.min(500, Math.max(1, Number(limitParam))) : undefined;
-    const frequencies = await getKeywordFrequencies(c.env.DB, { kind, limit });
+    const min_count = minCountParam
+      ? Math.min(50, Math.max(1, Number(minCountParam) || 1))
+      : undefined;
+    const frequencies = await getKeywordFrequencies(c.env.DB, { kind, limit, min_count });
     return c.json({ frequencies });
+  });
+
+  app.get('/api/images/flagged', async (c) => {
+    const limitParam = c.req.query('limit');
+    const limit = limitParam ? Math.min(50, Math.max(1, Number(limitParam) || 12)) : undefined;
+    const flags = await getFlaggedImages(c.env.DB, { limit });
+    return c.json({ flags });
   });
 
   return app;
