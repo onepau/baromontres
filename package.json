@@ -6,10 +6,10 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "dev:web": "pnpm --filter @baromontres/web dev",
-    "dev:cron": "pnpm --filter @baromontres/cron dev",
-    "deploy:web": "pnpm --filter @baromontres/web deploy",
-    "deploy:cron": "pnpm --filter @baromontres/cron deploy",
+    "dev:web": "pnpm --filter @baromontres/web run dev",
+    "dev:cron": "pnpm --filter @baromontres/cron run dev",
+    "deploy:web": "pnpm --filter @baromontres/web run deploy",
+    "deploy:cron": "pnpm --filter @baromontres/cron run deploy",
     "db:init:local": "wrangler d1 execute baromontres --local --file=migrations/0001_init.sql",
     "db:init:remote": "wrangler d1 execute baromontres --remote --file=migrations/0001_init.sql"
   },
