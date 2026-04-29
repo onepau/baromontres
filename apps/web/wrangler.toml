@@ -1,0 +1,10 @@
+name = "baromontres"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-11-12"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "baromontres"
+# Replace with the real D1 database id after `wrangler d1 create baromontres`.
+database_id = "REPLACE_WITH_D1_ID"
