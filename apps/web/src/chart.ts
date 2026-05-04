@@ -60,8 +60,26 @@ export function renderBarometer(
       pointBorderColor: colors,
       backgroundColor: colors,
       borderColor: colors,
+      order: 0,
     },
   ];
+
+  const monthlyMeans = monthlyAverage(points);
+  if (monthlyMeans.length >= 2) {
+    datasets.push({
+      label: 'monthly_average',
+      data: monthlyMeans as unknown as { x: number; y: number }[],
+      parsing: false,
+      showLine: true,
+      borderDash: [3, 4],
+      borderColor: 'rgba(251, 191, 36, 0.7)',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      tension: 0.35,
+      order: 1,
+    });
+  }
 
   if (subscription) {
     datasets.push({
@@ -72,10 +90,11 @@ export function renderBarometer(
       ] as unknown as { x: number; y: number }[],
       parsing: false,
       showLine: true,
-      borderColor: 'rgba(120,120,120,0.6)',
+      borderColor: 'rgba(160,160,160,0.5)',
       borderDash: [4, 4],
       pointRadius: 0,
       borderWidth: 1.5,
+      order: 2,
     });
   }
 
@@ -148,6 +167,28 @@ function renderHtmlTooltip(
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
   el.hidden = false;
+}
+
+function monthlyAverage(points: BarometerPoint[]): { x: number; y: number }[] {
+  const buckets = new Map<string, { sum: number; count: number }>();
+  for (const p of points) {
+    const key = p.published_at.slice(0, 7); // YYYY-MM
+    const b = buckets.get(key) ?? { sum: 0, count: 0 };
+    b.sum += p.unit_price_chf;
+    b.count += 1;
+    buckets.set(key, b);
+  }
+  const out: { x: number; y: number }[] = [];
+  for (const [key, b] of [...buckets.entries()].sort(([a], [c]) => a.localeCompare(c))) {
+    if (b.count === 0) continue;
+    const [yStr, mStr] = key.split('-');
+    const y = Number(yStr);
+    const m = Number(mStr);
+    // Mid-month timestamp (UTC), avoids edge-of-month visual bias.
+    const x = Date.UTC(y, m - 1, 15);
+    out.push({ x, y: b.sum / b.count });
+  }
+  return out;
 }
 
 function formatDate(iso: string, lang: 'fr' | 'en'): string {

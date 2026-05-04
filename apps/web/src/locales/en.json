@@ -19,5 +19,9 @@
   "paywall": "paywall",
   "free": "free",
   "noData": "No data yet.",
-  "adPlaceholder": "Advertisement"
+  "adPlaceholder": "Advertisement",
+  "imageFlagsEmpty": "No flagged images yet.",
+  "aiBadge": "AI",
+  "popCultureOther": "Doctored",
+  "trendMonthlyAverage": "Monthly average"
 }

@@ -201,21 +201,65 @@ export interface KeywordFrequency {
   article_count: number;
 }
 
+export interface FlaggedImage {
+  article_id: number;
+  url: string;
+  title: string;
+  published_at: string;
+  image_url: string;
+  pop_culture_source: string | null;
+  ai_generated_likelihood: number | null;
+  notes: string | null;
+}
+
+export async function getFlaggedImages(
+  db: D1Database,
+  opts: { limit?: number } = {},
+): Promise<FlaggedImage[]> {
+  const limit = opts.limit ?? 12;
+  const { results } = await db
+    .prepare(
+      `SELECT a.id            AS article_id,
+              a.url           AS url,
+              a.title         AS title,
+              a.published_at  AS published_at,
+              i.image_url     AS image_url,
+              i.pop_culture_source AS pop_culture_source,
+              i.ai_generated_likelihood AS ai_generated_likelihood,
+              i.notes         AS notes
+         FROM image_analysis i
+         JOIN article a ON a.id = i.article_id
+        WHERE i.pop_culture_source IS NOT NULL
+           OR (i.ai_generated_likelihood IS NOT NULL AND i.ai_generated_likelihood >= 0.5)
+        ORDER BY a.published_at DESC
+        LIMIT ?`,
+    )
+    .bind(limit)
+    .all<FlaggedImage>();
+  return results ?? [];
+}
+
 export async function getKeywordFrequencies(
   db: D1Database,
-  opts: { kind?: KeywordKind; limit?: number } = {},
+  opts: { kind?: KeywordKind; limit?: number; min_count?: number } = {},
 ): Promise<KeywordFrequency[]> {
   const limit = opts.limit ?? 50;
+  const minCount = opts.min_count ?? 1;
   const where = opts.kind ? `WHERE kind = ?` : '';
+  const having = minCount > 1 ? `HAVING COUNT(DISTINCT article_id) >= ?` : '';
   const stmt = db.prepare(
     `SELECT term, term_en, kind, COUNT(DISTINCT article_id) AS article_count
        FROM keyword
        ${where}
        GROUP BY term, kind
+       ${having}
        ORDER BY article_count DESC, term ASC
        LIMIT ?`,
   );
-  const bound = opts.kind ? stmt.bind(opts.kind, limit) : stmt.bind(limit);
-  const { results } = await bound.all<KeywordFrequency>();
+  const params: unknown[] = [];
+  if (opts.kind) params.push(opts.kind);
+  if (minCount > 1) params.push(minCount);
+  params.push(limit);
+  const { results } = await stmt.bind(...params).all<KeywordFrequency>();
   return results ?? [];
 }

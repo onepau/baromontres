@@ -19,5 +19,9 @@
   "paywall": "payant",
   "free": "gratuit",
   "noData": "Aucune donnée pour le moment.",
-  "adPlaceholder": "Espace publicitaire"
+  "adPlaceholder": "Espace publicitaire",
+  "imageFlagsEmpty": "Aucune image signalée pour l'instant.",
+  "aiBadge": "IA",
+  "popCultureOther": "Détourné",
+  "trendMonthlyAverage": "Moyenne mensuelle"
 }

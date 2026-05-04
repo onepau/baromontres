@@ -1,19 +1,23 @@
 import 'chartjs-adapter-date-fns';
 import { applyDom, bindLangSwitch, getLang, setLang, t } from './i18n.ts';
-import { fetchBarometer, fetchKeywords } from './api.ts';
+import {
+  fetchBarometer,
+  fetchFlaggedImages,
+  fetchKeywords,
+  type FlaggedImage,
+} from './api.ts';
 import { renderBarometer } from './chart.ts';
 import type { BarometerPoint } from '@baromontres/shared/schema';
 import type { Chart } from 'chart.js';
 
 let chart: Chart | null = null;
-let lastPoints: BarometerPoint[] = [];
 
 async function boot(): Promise<void> {
   setLang(getLang());
   bindLangSwitch(() => {
     applyDom();
-    renderTopics();
-    renderImageFlags();
+    void renderTopics();
+    void renderImageFlags();
   });
   await Promise.all([renderChart(), renderTopics(), renderImageFlags()]);
 }
@@ -24,7 +28,6 @@ async function renderChart(): Promise<void> {
   if (!canvas || !tooltipEl) return;
   try {
     const { points, subscription } = await fetchBarometer();
-    lastPoints = points;
     chart?.destroy();
     chart = renderBarometer(canvas, tooltipEl, points, subscription);
     updateMeta(points, subscription?.price_chf ?? null);
@@ -65,7 +68,7 @@ async function renderTopics(): Promise<void> {
   try {
     const [brands, topics] = await Promise.all([
       fetchKeywords('brand', 30),
-      fetchKeywords('topic', 30),
+      fetchKeywords('topic', 30, 4),
     ]);
     brandsEl.replaceChildren(...brands.map(chipNode));
     topicsEl.replaceChildren(...topics.map(chipNode));
@@ -89,33 +92,80 @@ function chipNode(k: { term: string; term_en: string | null; article_count: numb
 
 async function renderImageFlags(): Promise<void> {
   const list = document.getElementById('image-flags-list');
+  const empty = document.getElementById('image-flags-empty');
   if (!list) return;
-  // The barometer points already have hero image URLs; we surface the most
-  // recent flagged ones by querying the article detail endpoint lazily.
-  // For an MVP we simply show the latest 8 articles with a hero image.
-  const recent = [...lastPoints]
-    .sort((a, b) => b.published_at.localeCompare(a.published_at))
-    .filter((p) => p.hero_image_url)
-    .slice(0, 8);
-  if (recent.length === 0) {
-    list.replaceChildren();
-    return;
+  try {
+    const flags = await fetchFlaggedImages(12);
+    if (flags.length === 0) {
+      list.replaceChildren();
+      if (empty) {
+        empty.textContent = t('imageFlagsEmpty');
+        empty.hidden = false;
+      }
+      return;
+    }
+    if (empty) empty.hidden = true;
+    list.replaceChildren(...flags.map(flagNode));
+  } catch (err) {
+    console.error(err);
   }
-  list.replaceChildren(
-    ...recent.map((p) => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = p.url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = p.title;
-      const meta = document.createElement('span');
-      meta.className = 'flag-meta';
-      meta.textContent = formatShortDate(p.published_at, getLang());
-      li.append(a, meta);
-      return li;
-    }),
-  );
+}
+
+function flagNode(f: FlaggedImage): HTMLElement {
+  const li = document.createElement('li');
+
+  const img = document.createElement('img');
+  img.className = 'flag-thumb';
+  img.src = f.image_url;
+  img.alt = '';
+  img.loading = 'lazy';
+  img.referrerPolicy = 'no-referrer';
+
+  const body = document.createElement('div');
+  body.className = 'flag-body';
+
+  const a = document.createElement('a');
+  a.href = f.url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = f.title;
+  body.append(a);
+
+  const meta = document.createElement('div');
+  meta.className = 'flag-meta';
+  meta.textContent = formatShortDate(f.published_at, getLang());
+  body.append(meta);
+
+  const badges = document.createElement('div');
+  badges.className = 'flag-badges';
+  if (f.pop_culture_source) {
+    const b = document.createElement('span');
+    b.className = 'badge badge-pop';
+    b.textContent = popCultureLabel(f.pop_culture_source);
+    badges.append(b);
+  }
+  if (f.ai_generated_likelihood !== null && f.ai_generated_likelihood >= 0.5) {
+    const b = document.createElement('span');
+    b.className = 'badge badge-ai';
+    b.textContent = `${t('aiBadge')} ${Math.round(f.ai_generated_likelihood * 100)}%`;
+    badges.append(b);
+  }
+  body.append(badges);
+
+  li.append(img, body);
+  return li;
+}
+
+function popCultureLabel(src: string): string {
+  const map: Record<string, string> = {
+    peanuts: 'Peanuts',
+    tintin: 'Tintin',
+    asterix: 'Astérix',
+    gaston: 'Gaston',
+    calvin_hobbes: 'Calvin & Hobbes',
+    other: t('popCultureOther'),
+  };
+  return map[src] ?? src;
 }
 
 function formatShortDate(iso: string, lang: 'fr' | 'en'): string {

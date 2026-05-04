@@ -74,10 +74,16 @@ async function callImageEnrichment(
         notes: parsed.notes ?? null,
       },
     ];
-  } catch {
+  } catch (err) {
     // image fetch can fail (CDN expired, hotlink protection); record nothing
+    console.warn('image enrichment failed', row.url, stringifyError(err));
     return [];
   }
+}
+
+function stringifyError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 function buildTextUserBlock(row: ArticleRow): string {

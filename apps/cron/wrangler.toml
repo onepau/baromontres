@@ -17,7 +17,8 @@ database_id = "REPLACE_WITH_D1_ID"
 # vars are not used; secrets only.
 
 [vars]
-SCRAPE_LIMIT = "200"
-ENRICH_LIMIT = "20"
-USER_AGENT   = "baromontres/2.0 (+https://github.com/onepau/baromontres)"
-SOURCE_BASE  = "https://www.businessmontres.com"
+SCRAPE_LIMIT  = "500"
+ENRICH_LIMIT  = "20"
+LISTING_PAGES = "4"
+USER_AGENT    = "baromontres/2.0 (+https://github.com/onepau/baromontres)"
+SOURCE_BASE   = "https://www.businessmontres.com"

@@ -79,11 +79,18 @@ paid article, one free article).
 
 ## Backfill
 
-The cron worker also handles backfill: bump `SCRAPE_LIMIT` in
-`apps/cron/wrangler.toml` and POST `/run` once. The current default keeps
-~12 months of articles by paginating only the first three listing pages — if
-you want deeper history, increase the page count in `discoverArticleUrls`
-(`apps/cron/src/scrape.ts`) and re-deploy.
+The daily cron walks `LISTING_PAGES` (default 4) listing pages — enough to
+catch new posts without hammering the source. To backfill ~12 months in one
+pass, POST `/run?pages=N`:
+
+```sh
+curl -X POST "https://baromontres-cron.<sub>.workers.dev/run?pages=40"
+```
+
+Discovery stops early when a page yields no new URLs or returns 404, so an
+oversized `pages` value is safe. Each listing fetch sleeps ~700 ms.
+Enrichment then catches up over subsequent daily runs (or POST `/run` again
+to accelerate).
 
 ## Notes
 
