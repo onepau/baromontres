@@ -1,4 +1,4 @@
-name = "baromontres-web"
+name = "baromontres"
 main = "apps/web/src/worker.ts"
 compatibility_date = "2024-11-12"
 compatibility_flags = ["nodejs_compat"]
