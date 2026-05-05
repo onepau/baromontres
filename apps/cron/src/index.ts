@@ -45,7 +45,7 @@ async function runPipeline(
   const errors: string[] = [];
   const scrapeLimit = Number(env.SCRAPE_LIMIT) || 200;
   const enrichLimit = Number(env.ENRICH_LIMIT) || 20;
-  const listingPages = opts.pages ?? Number(env.LISTING_PAGES) || 4;
+  const listingPages = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
 
   const seen = await existingUrls(env.DB);
   const candidates = await discoverArticleUrls(
