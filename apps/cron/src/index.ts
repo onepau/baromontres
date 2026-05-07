@@ -19,12 +19,14 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === '/run' && req.method === 'POST') {
       const pagesParam = url.searchParams.get('pages');
+      const startPageParam = url.searchParams.get('start_page');
       const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
-      // Backfill (?pages=N) runs much longer than the 30s response budget.
+      const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
+      // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
-      if (pages) {
-        ctx.waitUntil(runPipeline(env, { pages }));
-        return Response.json({ started: true, pages });
+      if (pages || startPage) {
+        ctx.waitUntil(runPipeline(env, { pages, startPage }));
+        return Response.json({ started: true, startPage: startPage ?? 1, pages });
       }
       const result = await runPipeline(env);
       return Response.json(result);
@@ -35,7 +37,7 @@ export default {
 
 async function runPipeline(
   env: CronEnv,
-  opts: { pages?: number } = {},
+  opts: { pages?: number; startPage?: number } = {},
 ): Promise<{
   discovered: number;
   scraped: number;
@@ -45,14 +47,17 @@ async function runPipeline(
   const errors: string[] = [];
   const scrapeLimit = Number(env.SCRAPE_LIMIT) || 200;
   const enrichLimit = Number(env.ENRICH_LIMIT) || 20;
-  const listingPages = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
+  const startPage = opts.startPage ?? 1;
+  const pageCount = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
+  const endPage = startPage + pageCount - 1;
 
   const seen = await existingUrls(env.DB);
   const candidates = await discoverArticleUrls(
     env.SOURCE_BASE,
     env.USER_AGENT,
     scrapeLimit,
-    listingPages,
+    startPage,
+    endPage,
   );
   const fresh = candidates.filter((u) => !seen.has(u));
 

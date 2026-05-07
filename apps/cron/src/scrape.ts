@@ -7,13 +7,14 @@ export async function discoverArticleUrls(
   sourceBase: string,
   userAgent: string,
   limit: number,
-  maxPages = 3,
+  startPage = 1,
+  endPage = 3,
 ): Promise<string[]> {
   const seen = new Set<string>();
-  for (let n = 1; n <= maxPages; n++) {
+  for (let n = startPage; n <= endPage; n++) {
     if (seen.size >= limit) break;
     const page = n === 1 ? sourceBase : `${sourceBase}/page/${n}`;
-    if (n > 1) await sleep(700);
+    if (n > startPage) await sleep(700);
     let html: string;
     try {
       html = await fetchText(page, userAgent);
@@ -30,7 +31,7 @@ export async function discoverArticleUrls(
       seen.add(normalizeUrl(href));
       if (seen.size >= limit) break;
     }
-    if (n > 1 && seen.size === before) break;
+    if (n > startPage && seen.size === before) break;
   }
   return [...seen];
 }
