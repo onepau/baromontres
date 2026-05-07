@@ -74,26 +74,46 @@ async function runPipeline(
   const fresh = candidates.filter((u) => !seen.has(u));
   console.log(`discovery: candidates=${candidates.length} fresh=${fresh.length}`);
 
+  // Process scrapes in parallel batches: fetch + parse is the slow part
+  // (~3s each serially), so 5x concurrency cuts wall time roughly 5x.
+  const BATCH_SIZE = 5;
   let scraped = 0;
-  for (const url of fresh) {
+  outer: for (let i = 0; i < fresh.length; i += BATCH_SIZE) {
     if (budgetExceeded()) {
       console.log(`scrape phase: time budget reached at ${scraped}/${fresh.length}`);
       break;
     }
-    try {
-      const article = await fetchAndParse(url, env.USER_AGENT);
-      if (!article) {
+    const batch = fresh.slice(i, i + BATCH_SIZE);
+    const settled = await Promise.allSettled(
+      batch.map((u) => fetchAndParse(u, env.USER_AGENT)),
+    );
+    for (let j = 0; j < settled.length; j++) {
+      const url = batch[j]!;
+      const r = settled[j]!;
+      if (r.status === 'rejected') {
+        const msg = stringifyError(r.reason);
+        console.error(`scrape failed: ${url} :: ${msg}`);
+        errors.push(`scrape ${url}: ${msg}`);
+        continue;
+      }
+      if (!r.value) {
         console.warn(`scrape skipped (parse returned null): ${url}`);
         continue;
       }
-      await upsertArticle(env.DB, article);
-      scraped += 1;
-      await sleep(250);
-    } catch (err) {
-      const msg = stringifyError(err);
-      console.error(`scrape failed: ${url} :: ${msg}`);
-      errors.push(`scrape ${url}: ${msg}`);
+      try {
+        await upsertArticle(env.DB, r.value);
+        scraped += 1;
+      } catch (err) {
+        const msg = stringifyError(err);
+        console.error(`upsert failed: ${url} :: ${msg}`);
+        errors.push(`upsert ${url}: ${msg}`);
+      }
+      if (budgetExceeded()) {
+        console.log(`scrape phase: time budget reached at ${scraped}/${fresh.length}`);
+        break outer;
+      }
     }
+    await sleep(150);
   }
   console.log(`scrape phase done: scraped=${scraped}/${fresh.length}`);
 
