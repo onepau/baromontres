@@ -21,14 +21,22 @@ export default {
       const pagesParam = url.searchParams.get('pages');
       const startPageParam = url.searchParams.get('start_page');
       const enrichLimitParam = url.searchParams.get('enrich_limit');
+      const scrapeMaxParam = url.searchParams.get('scrape_max');
       const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
       const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
       const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
+      const scrapeMax = scrapeMaxParam ? clampInt(scrapeMaxParam, 1, 500) : undefined;
       // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
-      if (pages || startPage || enrichLimit !== undefined) {
-        ctx.waitUntil(runPipeline(env, { pages, startPage, enrichLimit }));
-        return Response.json({ started: true, startPage: startPage ?? 1, pages, enrichLimit });
+      if (pages || startPage || enrichLimit !== undefined || scrapeMax !== undefined) {
+        ctx.waitUntil(runPipeline(env, { pages, startPage, enrichLimit, scrapeMax }));
+        return Response.json({
+          started: true,
+          startPage: startPage ?? 1,
+          pages,
+          enrichLimit,
+          scrapeMax,
+        });
       }
       const result = await runPipeline(env);
       return Response.json(result);
@@ -39,7 +47,7 @@ export default {
 
 async function runPipeline(
   env: CronEnv,
-  opts: { pages?: number; startPage?: number; enrichLimit?: number } = {},
+  opts: { pages?: number; startPage?: number; enrichLimit?: number; scrapeMax?: number } = {},
 ): Promise<{
   discovered: number;
   scraped: number;
@@ -49,6 +57,10 @@ async function runPipeline(
   const errors: string[] = [];
   const scrapeLimit = Number(env.SCRAPE_LIMIT) || 200;
   const enrichLimit = opts.enrichLimit ?? (Number(env.ENRICH_LIMIT) || 20);
+  // Cloudflare subrequest cap per invocation: ~50 default, ~100k max.
+  // Each scrape uses 2 subrequests (fetch + D1 upsert), discovery uses
+  // pageCount + 1. Default 18 keeps total under 50.
+  const scrapeMax = opts.scrapeMax ?? 18;
   const startPage = opts.startPage ?? 1;
   const pageCount = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
   const endPage = startPage + pageCount - 1;
@@ -72,19 +84,22 @@ async function runPipeline(
     endPage,
   );
   const fresh = candidates.filter((u) => !seen.has(u));
-  console.log(`discovery: candidates=${candidates.length} fresh=${fresh.length}`);
+  const toScrape = fresh.slice(0, scrapeMax);
+  console.log(
+    `discovery: candidates=${candidates.length} fresh=${fresh.length} scraping=${toScrape.length}/${scrapeMax}`,
+  );
 
   // Process the whole fetch→parse→upsert chain concurrently per batch.
   // Fetch is I/O-bound, parse is CPU-bound, upsert is I/O-bound; running
   // them all in parallel pipelines those phases across articles.
-  const BATCH_SIZE = 8;
+  const BATCH_SIZE = 6;
   let scraped = 0;
-  for (let i = 0; i < fresh.length; i += BATCH_SIZE) {
+  for (let i = 0; i < toScrape.length; i += BATCH_SIZE) {
     if (budgetExceeded()) {
-      console.log(`scrape phase: time budget reached at ${scraped}/${fresh.length}`);
+      console.log(`scrape phase: time budget reached at ${scraped}/${toScrape.length}`);
       break;
     }
-    const batch = fresh.slice(i, i + BATCH_SIZE);
+    const batch = toScrape.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
       batch.map(async (url) => {
         const article = await fetchAndParse(url, env.USER_AGENT);
@@ -109,7 +124,7 @@ async function runPipeline(
       scraped += 1;
     }
   }
-  console.log(`scrape phase done: scraped=${scraped}/${fresh.length}`);
+  console.log(`scrape phase done: scraped=${scraped}/${toScrape.length}`);
 
   let enriched = 0;
   if (enrichLimit > 0 && !budgetExceeded()) {
