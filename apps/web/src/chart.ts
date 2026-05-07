@@ -10,10 +10,22 @@ import {
   type ChartConfiguration,
   type TooltipModel,
 } from 'chart.js';
+import zoomPlugin from 'chartjs-plugin-zoom';
 import type { BarometerPoint, SubscriptionPriceRow } from '@baromontres/shared/schema';
 import { getLang, t } from './i18n.ts';
 
-Chart.register(LineController, LineElement, PointElement, LinearScale, TimeScale, Tooltip, Filler);
+Chart.register(
+  LineController,
+  LineElement,
+  PointElement,
+  LinearScale,
+  TimeScale,
+  Tooltip,
+  Filler,
+  zoomPlugin,
+);
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 const SENTIMENT_COLOR = {
   positive: '#2f9e44',
@@ -120,6 +132,20 @@ export function renderBarometer(
         tooltip: {
           enabled: false,
           external: (ctx) => renderHtmlTooltip(ctx, tooltipEl, canvas),
+        },
+        zoom: {
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'xy',
+          },
+          pan: {
+            enabled: true,
+            mode: 'xy',
+          },
+          limits: {
+            x: { minRange: SEVEN_DAYS_MS },
+          },
         },
       },
     },
