@@ -88,6 +88,7 @@ describe('discoverArticleUrls', () => {
       'https://www.businessmontres.com',
       'test',
       100,
+      1,
       10,
     );
     expect(urls).toHaveLength(2);
@@ -107,9 +108,30 @@ describe('discoverArticleUrls', () => {
       'https://www.businessmontres.com',
       'test',
       100,
+      1,
       10,
     );
     expect(urls).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('respects a startPage offset and skips earlier pages', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo) => {
+      const url = String(input);
+      if (url.endsWith('/page/11')) return new Response(pageHtml(['x', 'y']));
+      if (url.endsWith('/page/12')) return new Response(pageHtml(['z']));
+      return new Response('should not fetch', { status: 500 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const urls = await discoverArticleUrls(
+      'https://www.businessmontres.com',
+      'test',
+      100,
+      11,
+      12,
+    );
+    expect(urls).toHaveLength(3);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
