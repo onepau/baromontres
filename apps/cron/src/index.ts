@@ -53,6 +53,13 @@ async function runPipeline(
   const pageCount = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
   const endPage = startPage + pageCount - 1;
 
+  // Cloudflare's waitUntil budget for fetch handlers is ~30s. Stop cleanly
+  // before the runtime kills us so partial work commits and the next call
+  // can resume (dedupe handles overlap).
+  const BUDGET_MS = 25000;
+  const startedAt = Date.now();
+  const budgetExceeded = () => Date.now() - startedAt > BUDGET_MS;
+
   const seen = await existingUrls(env.DB);
   console.log(
     `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit}`,
@@ -69,6 +76,10 @@ async function runPipeline(
 
   let scraped = 0;
   for (const url of fresh) {
+    if (budgetExceeded()) {
+      console.log(`scrape phase: time budget reached at ${scraped}/${fresh.length}`);
+      break;
+    }
     try {
       const article = await fetchAndParse(url, env.USER_AGENT);
       if (!article) {
@@ -77,7 +88,7 @@ async function runPipeline(
       }
       await upsertArticle(env.DB, article);
       scraped += 1;
-      await sleep(1000);
+      await sleep(250);
     } catch (err) {
       const msg = stringifyError(err);
       console.error(`scrape failed: ${url} :: ${msg}`);
@@ -87,10 +98,14 @@ async function runPipeline(
   console.log(`scrape phase done: scraped=${scraped}/${fresh.length}`);
 
   let enriched = 0;
-  if (enrichLimit > 0) {
+  if (enrichLimit > 0 && !budgetExceeded()) {
     const pending = await listUnenriched(env.DB, enrichLimit);
     console.log(`enrich phase: pending=${pending.length} (limit=${enrichLimit})`);
     for (const row of pending) {
+      if (budgetExceeded()) {
+        console.log(`enrich phase: time budget reached at ${enriched}/${pending.length}`);
+        break;
+      }
       try {
         await enrichArticle(env, row);
         enriched += 1;
@@ -100,8 +115,10 @@ async function runPipeline(
         errors.push(`enrich ${row.url}: ${msg}`);
       }
     }
-  } else {
+  } else if (enrichLimit === 0) {
     console.log(`enrich phase: skipped (enrich_limit=0)`);
+  } else {
+    console.log(`enrich phase: skipped (no time budget remaining)`);
   }
   console.log(
     `pipeline done: discovered=${candidates.length} scraped=${scraped} enriched=${enriched} errors=${errors.length}`,
