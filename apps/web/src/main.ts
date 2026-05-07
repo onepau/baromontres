@@ -19,17 +19,27 @@ async function boot(): Promise<void> {
     void renderTopics();
     void renderImageFlags();
   });
+  bindResetZoom();
   await Promise.all([renderChart(), renderTopics(), renderImageFlags()]);
+}
+
+function bindResetZoom(): void {
+  const btn = document.getElementById('reset-zoom');
+  btn?.addEventListener('click', () => {
+    chart?.resetZoom();
+  });
 }
 
 async function renderChart(): Promise<void> {
   const canvas = document.getElementById('barometer') as HTMLCanvasElement | null;
   const tooltipEl = document.getElementById('tooltip');
+  const resetBtn = document.getElementById('reset-zoom');
   if (!canvas || !tooltipEl) return;
   try {
     const { points, subscription } = await fetchBarometer();
     chart?.destroy();
     chart = renderBarometer(canvas, tooltipEl, points, subscription);
+    if (resetBtn) resetBtn.hidden = chart === null;
     updateMeta(points, subscription?.price_chf ?? null);
   } catch (err) {
     console.error(err);

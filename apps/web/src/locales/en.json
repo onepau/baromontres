@@ -23,5 +23,6 @@
   "imageFlagsEmpty": "No flagged images yet.",
   "aiBadge": "AI",
   "popCultureOther": "Doctored",
-  "trendMonthlyAverage": "Monthly average"
+  "trendMonthlyAverage": "Monthly average",
+  "resetZoom": "Reset zoom"
 }
