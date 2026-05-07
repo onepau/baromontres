@@ -52,6 +52,9 @@ async function runPipeline(
   const endPage = startPage + pageCount - 1;
 
   const seen = await existingUrls(env.DB);
+  console.log(
+    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit}`,
+  );
   const candidates = await discoverArticleUrls(
     env.SOURCE_BASE,
     env.USER_AGENT,
@@ -60,30 +63,43 @@ async function runPipeline(
     endPage,
   );
   const fresh = candidates.filter((u) => !seen.has(u));
+  console.log(`discovery: candidates=${candidates.length} fresh=${fresh.length}`);
 
   let scraped = 0;
   for (const url of fresh) {
     try {
       const article = await fetchAndParse(url, env.USER_AGENT);
-      if (!article) continue;
+      if (!article) {
+        console.warn(`scrape skipped (parse returned null): ${url}`);
+        continue;
+      }
       await upsertArticle(env.DB, article);
       scraped += 1;
       await sleep(1000);
     } catch (err) {
-      errors.push(`scrape ${url}: ${stringifyError(err)}`);
+      const msg = stringifyError(err);
+      console.error(`scrape failed: ${url} :: ${msg}`);
+      errors.push(`scrape ${url}: ${msg}`);
     }
   }
+  console.log(`scrape phase done: scraped=${scraped}/${fresh.length}`);
 
   const pending = await listUnenriched(env.DB, enrichLimit);
+  console.log(`enrich phase: pending=${pending.length}`);
   let enriched = 0;
   for (const row of pending) {
     try {
       await enrichArticle(env, row);
       enriched += 1;
     } catch (err) {
-      errors.push(`enrich ${row.url}: ${stringifyError(err)}`);
+      const msg = stringifyError(err);
+      console.error(`enrich failed: ${row.url} :: ${msg}`);
+      errors.push(`enrich ${row.url}: ${msg}`);
     }
   }
+  console.log(
+    `pipeline done: discovered=${candidates.length} scraped=${scraped} enriched=${enriched} errors=${errors.length}`,
+  );
 
   return { discovered: candidates.length, scraped, enriched, errors };
 }
