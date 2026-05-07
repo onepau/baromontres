@@ -11,20 +11,22 @@ export async function discoverArticleUrls(
   startPage = 1,
   endPage = 3,
 ): Promise<string[]> {
+  const pageNumbers: number[] = [];
+  for (let n = startPage; n <= endPage; n++) pageNumbers.push(n);
+
+  const results = await Promise.allSettled(
+    pageNumbers.map((n) => {
+      const url =
+        n === 1 ? `${sourceBase}/archives` : `${sourceBase}/archives?page=${n}`;
+      return fetchText(url, userAgent);
+    }),
+  );
+
   const seen = new Set<string>();
-  for (let n = startPage; n <= endPage; n++) {
+  for (const r of results) {
+    if (r.status === 'rejected') continue;
     if (seen.size >= limit) break;
-    const page = n === 1 ? `${sourceBase}/archives` : `${sourceBase}/archives?page=${n}`;
-    if (n > startPage) await sleep(700);
-    let html: string;
-    try {
-      html = await fetchText(page, userAgent);
-    } catch {
-      // 404 past the end of pagination is the natural stop.
-      break;
-    }
-    const before = seen.size;
-    const { document } = parseHTML(html);
+    const { document } = parseHTML(r.value);
     for (const a of Array.from(document.querySelectorAll('a[href]'))) {
       const href = (a as Element).getAttribute('href');
       if (!href) continue;
@@ -34,13 +36,8 @@ export async function discoverArticleUrls(
       seen.add(normalized);
       if (seen.size >= limit) break;
     }
-    if (n > startPage && seen.size === before) break;
   }
   return [...seen];
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
 }
 
 export async function fetchAndParse(
