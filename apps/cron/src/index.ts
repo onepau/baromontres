@@ -20,13 +20,15 @@ export default {
     if (url.pathname === '/run' && req.method === 'POST') {
       const pagesParam = url.searchParams.get('pages');
       const startPageParam = url.searchParams.get('start_page');
+      const enrichLimitParam = url.searchParams.get('enrich_limit');
       const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
       const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
+      const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
       // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
-      if (pages || startPage) {
-        ctx.waitUntil(runPipeline(env, { pages, startPage }));
-        return Response.json({ started: true, startPage: startPage ?? 1, pages });
+      if (pages || startPage || enrichLimit !== undefined) {
+        ctx.waitUntil(runPipeline(env, { pages, startPage, enrichLimit }));
+        return Response.json({ started: true, startPage: startPage ?? 1, pages, enrichLimit });
       }
       const result = await runPipeline(env);
       return Response.json(result);
@@ -37,7 +39,7 @@ export default {
 
 async function runPipeline(
   env: CronEnv,
-  opts: { pages?: number; startPage?: number } = {},
+  opts: { pages?: number; startPage?: number; enrichLimit?: number } = {},
 ): Promise<{
   discovered: number;
   scraped: number;
@@ -46,7 +48,7 @@ async function runPipeline(
 }> {
   const errors: string[] = [];
   const scrapeLimit = Number(env.SCRAPE_LIMIT) || 200;
-  const enrichLimit = Number(env.ENRICH_LIMIT) || 20;
+  const enrichLimit = opts.enrichLimit ?? (Number(env.ENRICH_LIMIT) || 20);
   const startPage = opts.startPage ?? 1;
   const pageCount = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
   const endPage = startPage + pageCount - 1;
@@ -84,18 +86,22 @@ async function runPipeline(
   }
   console.log(`scrape phase done: scraped=${scraped}/${fresh.length}`);
 
-  const pending = await listUnenriched(env.DB, enrichLimit);
-  console.log(`enrich phase: pending=${pending.length}`);
   let enriched = 0;
-  for (const row of pending) {
-    try {
-      await enrichArticle(env, row);
-      enriched += 1;
-    } catch (err) {
-      const msg = stringifyError(err);
-      console.error(`enrich failed: ${row.url} :: ${msg}`);
-      errors.push(`enrich ${row.url}: ${msg}`);
+  if (enrichLimit > 0) {
+    const pending = await listUnenriched(env.DB, enrichLimit);
+    console.log(`enrich phase: pending=${pending.length} (limit=${enrichLimit})`);
+    for (const row of pending) {
+      try {
+        await enrichArticle(env, row);
+        enriched += 1;
+      } catch (err) {
+        const msg = stringifyError(err);
+        console.error(`enrich failed: ${row.url} :: ${msg}`);
+        errors.push(`enrich ${row.url}: ${msg}`);
+      }
     }
+  } else {
+    console.log(`enrich phase: skipped (enrich_limit=0)`);
   }
   console.log(
     `pipeline done: discovered=${candidates.length} scraped=${scraped} enriched=${enriched} errors=${errors.length}`,
