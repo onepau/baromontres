@@ -13,13 +13,13 @@ export async function discoverArticleUrls(
   const seen = new Set<string>();
   for (let n = startPage; n <= endPage; n++) {
     if (seen.size >= limit) break;
-    const page = n === 1 ? sourceBase : `${sourceBase}/page/${n}`;
+    const page = n === 1 ? `${sourceBase}/archives` : `${sourceBase}/archives?page=${n}`;
     if (n > startPage) await sleep(700);
     let html: string;
     try {
       html = await fetchText(page, userAgent);
     } catch {
-      // 404 on /page/N is the natural end of pagination; stop.
+      // 404 past the end of pagination is the natural stop.
       break;
     }
     const before = seen.size;

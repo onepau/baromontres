@@ -78,8 +78,8 @@ describe('discoverArticleUrls', () => {
   it('stops early when a page yields no new URLs', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
-      if (url.endsWith('/page/2')) return new Response(pageHtml(['a', 'b']));
-      if (url.endsWith('/page/3')) return new Response(pageHtml(['a', 'b']));
+      if (url.endsWith('/archives?page=2')) return new Response(pageHtml(['a', 'b']));
+      if (url.endsWith('/archives?page=3')) return new Response(pageHtml(['a', 'b']));
       return new Response(pageHtml(['a', 'b']));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -99,7 +99,8 @@ describe('discoverArticleUrls', () => {
   it('stops on a 404 listing page', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
-      if (url.endsWith('/page/2')) return new Response('not found', { status: 404 });
+      if (url.endsWith('/archives?page=2'))
+        return new Response('not found', { status: 404 });
       return new Response(pageHtml(['a', 'b']));
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -118,8 +119,8 @@ describe('discoverArticleUrls', () => {
   it('respects a startPage offset and skips earlier pages', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
-      if (url.endsWith('/page/11')) return new Response(pageHtml(['x', 'y']));
-      if (url.endsWith('/page/12')) return new Response(pageHtml(['z']));
+      if (url.endsWith('/archives?page=11')) return new Response(pageHtml(['x', 'y']));
+      if (url.endsWith('/archives?page=12')) return new Response(pageHtml(['z']));
       return new Response('should not fetch', { status: 500 });
     });
     vi.stubGlobal('fetch', fetchMock);
