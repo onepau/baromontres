@@ -74,18 +74,24 @@ async function runPipeline(
   const fresh = candidates.filter((u) => !seen.has(u));
   console.log(`discovery: candidates=${candidates.length} fresh=${fresh.length}`);
 
-  // Process scrapes in parallel batches: fetch + parse is the slow part
-  // (~3s each serially), so 5x concurrency cuts wall time roughly 5x.
-  const BATCH_SIZE = 5;
+  // Process the whole fetch→parse→upsert chain concurrently per batch.
+  // Fetch is I/O-bound, parse is CPU-bound, upsert is I/O-bound; running
+  // them all in parallel pipelines those phases across articles.
+  const BATCH_SIZE = 8;
   let scraped = 0;
-  outer: for (let i = 0; i < fresh.length; i += BATCH_SIZE) {
+  for (let i = 0; i < fresh.length; i += BATCH_SIZE) {
     if (budgetExceeded()) {
       console.log(`scrape phase: time budget reached at ${scraped}/${fresh.length}`);
       break;
     }
     const batch = fresh.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
-      batch.map((u) => fetchAndParse(u, env.USER_AGENT)),
+      batch.map(async (url) => {
+        const article = await fetchAndParse(url, env.USER_AGENT);
+        if (!article) return { url, kind: 'null' as const };
+        await upsertArticle(env.DB, article);
+        return { url, kind: 'ok' as const };
+      }),
     );
     for (let j = 0; j < settled.length; j++) {
       const url = batch[j]!;
@@ -96,24 +102,12 @@ async function runPipeline(
         errors.push(`scrape ${url}: ${msg}`);
         continue;
       }
-      if (!r.value) {
+      if (r.value.kind === 'null') {
         console.warn(`scrape skipped (parse returned null): ${url}`);
         continue;
       }
-      try {
-        await upsertArticle(env.DB, r.value);
-        scraped += 1;
-      } catch (err) {
-        const msg = stringifyError(err);
-        console.error(`upsert failed: ${url} :: ${msg}`);
-        errors.push(`upsert ${url}: ${msg}`);
-      }
-      if (budgetExceeded()) {
-        console.log(`scrape phase: time budget reached at ${scraped}/${fresh.length}`);
-        break outer;
-      }
+      scraped += 1;
     }
-    await sleep(150);
   }
   console.log(`scrape phase done: scraped=${scraped}/${fresh.length}`);
 
