@@ -2,6 +2,7 @@ import { parseHTML } from 'linkedom';
 import type { ScrapedArticle } from '@baromontres/shared/queries';
 
 const ARTICLE_HREF = /https?:\/\/(www\.)?businessmontres\.com\/article\//i;
+const STUB_URL = /\/article\/default$/i;
 
 export async function discoverArticleUrls(
   sourceBase: string,
@@ -28,7 +29,9 @@ export async function discoverArticleUrls(
       const href = (a as Element).getAttribute('href');
       if (!href) continue;
       if (!ARTICLE_HREF.test(href)) continue;
-      seen.add(normalizeUrl(href));
+      const normalized = normalizeUrl(href);
+      if (STUB_URL.test(normalized)) continue;
+      seen.add(normalized);
       if (seen.size >= limit) break;
     }
     if (n > startPage && seen.size === before) break;
