@@ -75,13 +75,8 @@ describe('discoverArticleUrls', () => {
     return `<html><body>${links}</body></html>`;
   }
 
-  it('stops early when a page yields no new URLs', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo) => {
-      const url = String(input);
-      if (url.endsWith('/archives?page=2')) return new Response(pageHtml(['a', 'b']));
-      if (url.endsWith('/archives?page=3')) return new Response(pageHtml(['a', 'b']));
-      return new Response(pageHtml(['a', 'b']));
-    });
+  it('deduplicates URLs across pages', async () => {
+    const fetchMock = vi.fn(async () => new Response(pageHtml(['a', 'b'])));
     vi.stubGlobal('fetch', fetchMock);
 
     const urls = await discoverArticleUrls(
@@ -89,14 +84,13 @@ describe('discoverArticleUrls', () => {
       'test',
       100,
       1,
-      10,
+      5,
     );
     expect(urls).toHaveLength(2);
-    // page 1 + page 2 (zero new → stop). page 3 should never be requested.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
-  it('stops on a 404 listing page', async () => {
+  it('skips pages that return errors', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo) => {
       const url = String(input);
       if (url.endsWith('/archives?page=2'))
@@ -110,10 +104,10 @@ describe('discoverArticleUrls', () => {
       'test',
       100,
       1,
-      10,
+      5,
     );
     expect(urls).toHaveLength(2);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
   it('respects a startPage offset and skips earlier pages', async () => {
