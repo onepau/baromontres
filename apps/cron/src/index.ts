@@ -1,7 +1,25 @@
 import type { Env } from '@baromontres/shared/schema';
 import { listUnenriched, upsertArticle, existingUrls } from '@baromontres/shared/queries';
-import { discoverArticleUrls, fetchAndParse } from './scrape.ts';
+import {
+  discoverArticleUrls,
+  discoverFromSitemap,
+  fetchAndParse,
+  probeArchivePage,
+} from './scrape.ts';
 import { enrichArticle } from './enrich.ts';
+
+// How to backfill (operator recipe):
+//   # 1. See what we have, by month:
+//   curl https://baromontres-api.<acc>.workers.dev/api/diag/articles_by_month | jq
+//
+//   # 2. See what's actually on archive page N (read-only, no DB write):
+//   curl https://baromontres-cron.<acc>.workers.dev/probe?page=12 | jq
+//
+//   # 3. Fill the gap by date instead of guessing page numbers:
+//   curl -X POST 'https://baromontres-cron.<acc>.workers.dev/run?start_page=1&pages=50&until_date=2025-05-01&enrich_limit=0'
+//
+//   # 4. Drain enrichment afterwards:
+//   curl -X POST 'https://baromontres-cron.<acc>.workers.dev/run?enrich_limit=20'
 
 interface CronEnv extends Env {
   SCRAPE_LIMIT: string;
@@ -17,25 +35,48 @@ export default {
   },
   async fetch(req: Request, env: CronEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
+    if (url.pathname === '/probe' && req.method === 'GET') {
+      const pageParam = url.searchParams.get('page');
+      const page = pageParam ? clampInt(pageParam, 1, 1000) : 1;
+      const result = await probeArchivePage(env.SOURCE_BASE, env.USER_AGENT, page);
+      return Response.json(result);
+    }
     if (url.pathname === '/run' && req.method === 'POST') {
       const pagesParam = url.searchParams.get('pages');
       const startPageParam = url.searchParams.get('start_page');
       const enrichLimitParam = url.searchParams.get('enrich_limit');
       const scrapeMaxParam = url.searchParams.get('scrape_max');
+      const untilDateParam = url.searchParams.get('until_date');
+      const useSitemapParam = url.searchParams.get('use_sitemap');
       const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
       const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
       const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
       const scrapeMax = scrapeMaxParam ? clampInt(scrapeMaxParam, 1, 500) : undefined;
+      const untilDate = untilDateParam && /^\d{4}-\d{2}-\d{2}$/.test(untilDateParam)
+        ? untilDateParam
+        : undefined;
+      const useSitemap = useSitemapParam === '1' || useSitemapParam === 'true';
       // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
-      if (pages || startPage || enrichLimit !== undefined || scrapeMax !== undefined) {
-        ctx.waitUntil(runPipeline(env, { pages, startPage, enrichLimit, scrapeMax }));
+      if (
+        pages ||
+        startPage ||
+        enrichLimit !== undefined ||
+        scrapeMax !== undefined ||
+        untilDate ||
+        useSitemap
+      ) {
+        ctx.waitUntil(
+          runPipeline(env, { pages, startPage, enrichLimit, scrapeMax, untilDate, useSitemap }),
+        );
         return Response.json({
           started: true,
           startPage: startPage ?? 1,
           pages,
           enrichLimit,
           scrapeMax,
+          untilDate,
+          useSitemap,
         });
       }
       const result = await runPipeline(env);
@@ -47,7 +88,14 @@ export default {
 
 async function runPipeline(
   env: CronEnv,
-  opts: { pages?: number; startPage?: number; enrichLimit?: number; scrapeMax?: number } = {},
+  opts: {
+    pages?: number;
+    startPage?: number;
+    enrichLimit?: number;
+    scrapeMax?: number;
+    untilDate?: string;
+    useSitemap?: boolean;
+  } = {},
 ): Promise<{
   discovered: number;
   scraped: number;
@@ -64,6 +112,7 @@ async function runPipeline(
   const startPage = opts.startPage ?? 1;
   const pageCount = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
   const endPage = startPage + pageCount - 1;
+  const untilDate = opts.untilDate;
 
   // Cloudflare's waitUntil budget for fetch handlers is ~30s. Stop cleanly
   // before the runtime kills us so partial work commits and the next call
@@ -74,15 +123,29 @@ async function runPipeline(
 
   const seen = await existingUrls(env.DB);
   console.log(
-    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit}`,
+    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} untilDate=${untilDate ?? '-'} useSitemap=${opts.useSitemap ? '1' : '0'}`,
   );
-  const candidates = await discoverArticleUrls(
-    env.SOURCE_BASE,
-    env.USER_AGENT,
-    scrapeLimit,
-    startPage,
-    endPage,
-  );
+
+  let candidates: string[] = [];
+  if (opts.useSitemap) {
+    const sm = await discoverFromSitemap(env.SOURCE_BASE, env.USER_AGENT);
+    if (sm) {
+      candidates = sm.urls.slice(0, scrapeLimit);
+      console.log(`discovery via sitemap (${sm.source}): ${sm.urls.length} urls`);
+    } else {
+      console.log(`discovery: sitemap unavailable, falling back to archives`);
+    }
+  }
+  if (candidates.length === 0) {
+    candidates = await discoverArticleUrls(
+      env.SOURCE_BASE,
+      env.USER_AGENT,
+      scrapeLimit,
+      startPage,
+      endPage,
+    );
+    console.log(`discovery via archives: ${candidates.length} urls`);
+  }
   const fresh = candidates.filter((u) => !seen.has(u));
   const toScrape = fresh.slice(0, scrapeMax);
   console.log(
@@ -94,7 +157,8 @@ async function runPipeline(
   // them all in parallel pipelines those phases across articles.
   const BATCH_SIZE = 6;
   let scraped = 0;
-  for (let i = 0; i < toScrape.length; i += BATCH_SIZE) {
+  let oldestSeen: string | null = null;
+  outer: for (let i = 0; i < toScrape.length; i += BATCH_SIZE) {
     if (budgetExceeded()) {
       console.log(`scrape phase: time budget reached at ${scraped}/${toScrape.length}`);
       break;
@@ -105,7 +169,7 @@ async function runPipeline(
         const article = await fetchAndParse(url, env.USER_AGENT);
         if (!article) return { url, kind: 'null' as const };
         await upsertArticle(env.DB, article);
-        return { url, kind: 'ok' as const };
+        return { url, kind: 'ok' as const, published_at: article.published_at };
       }),
     );
     for (let j = 0; j < settled.length; j++) {
@@ -122,9 +186,15 @@ async function runPipeline(
         continue;
       }
       scraped += 1;
+      const pa = r.value.published_at;
+      if (pa && (oldestSeen === null || pa < oldestSeen)) oldestSeen = pa;
+    }
+    if (untilDate && oldestSeen && oldestSeen < untilDate) {
+      console.log(`scrape phase: until_date=${untilDate} reached (oldest=${oldestSeen})`);
+      break outer;
     }
   }
-  console.log(`scrape phase done: scraped=${scraped}/${toScrape.length}`);
+  console.log(`scrape phase done: scraped=${scraped}/${toScrape.length} oldest=${oldestSeen ?? '-'}`);
 
   let enriched = 0;
   if (enrichLimit > 0 && !budgetExceeded()) {

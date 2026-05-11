@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import {
   getArticleDetail,
+  getArticlesByMonth,
   getBarometer,
   getFlaggedImages,
   getImageDiagnostics,
@@ -69,6 +70,11 @@ export function createApi(): Hono<{ Bindings: Env }> {
   app.get('/api/diag/images', async (c) => {
     const diag = await getImageDiagnostics(c.env.DB);
     return c.json(diag);
+  });
+
+  app.get('/api/diag/articles_by_month', async (c) => {
+    const months = await getArticlesByMonth(c.env.DB);
+    return c.json({ months });
   });
 
   return app;

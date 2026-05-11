@@ -311,6 +311,27 @@ export async function getImageDiagnostics(db: D1Database): Promise<ImageDiagnost
   };
 }
 
+export interface ArticleMonthRow {
+  month: string;
+  count: number;
+  with_price: number;
+}
+
+export async function getArticlesByMonth(db: D1Database): Promise<ArticleMonthRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT substr(published_at, 1, 7) AS month,
+              COUNT(*)                                                    AS count,
+              SUM(CASE WHEN unit_price_chf IS NOT NULL THEN 1 ELSE 0 END) AS with_price
+         FROM article
+         WHERE published_at IS NOT NULL AND published_at <> ''
+         GROUP BY month
+         ORDER BY month ASC`,
+    )
+    .all<ArticleMonthRow>();
+  return results ?? [];
+}
+
 export async function getKeywordFrequencies(
   db: D1Database,
   opts: { kind?: KeywordKind; limit?: number; min_count?: number } = {},
