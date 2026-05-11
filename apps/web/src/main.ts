@@ -11,6 +11,8 @@ import type { BarometerPoint } from '@baromontres/shared/schema';
 import type { Chart } from 'chart.js';
 
 let chart: Chart | null = null;
+let allPoints: BarometerPoint[] = [];
+let currentSubscription: number | null = null;
 
 async function boot(): Promise<void> {
   setLang(getLang());
@@ -20,6 +22,7 @@ async function boot(): Promise<void> {
     void renderImageFlags();
   });
   bindResetZoom();
+  bindRangeFilter();
   await Promise.all([renderChart(), renderTopics(), renderImageFlags()]);
 }
 
@@ -27,7 +30,41 @@ function bindResetZoom(): void {
   const btn = document.getElementById('reset-zoom');
   btn?.addEventListener('click', () => {
     chart?.resetZoom();
+    setActiveRange('all');
   });
+}
+
+function bindRangeFilter(): void {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.range-filter button')) {
+    btn.addEventListener('click', () => {
+      const range = btn.dataset.range;
+      if (!range) return;
+      applyRange(range);
+      setActiveRange(range);
+    });
+  }
+}
+
+function applyRange(range: string): void {
+  if (!chart || allPoints.length === 0) return;
+  if (range === 'all') {
+    chart.resetZoom();
+    return;
+  }
+  const months: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 };
+  const m = months[range];
+  if (!m) return;
+  const last = new Date(allPoints[allPoints.length - 1]!.published_at).getTime();
+  if (!Number.isFinite(last)) return;
+  const start = new Date(last);
+  start.setMonth(start.getMonth() - m);
+  chart.zoomScale('x', { min: start.getTime(), max: last }, 'default');
+}
+
+function setActiveRange(range: string): void {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.range-filter button')) {
+    btn.setAttribute('aria-pressed', btn.dataset.range === range ? 'true' : 'false');
+  }
 }
 
 async function renderChart(): Promise<void> {
@@ -37,14 +74,29 @@ async function renderChart(): Promise<void> {
   if (!canvas || !tooltipEl) return;
   try {
     const { points, subscription } = await fetchBarometer();
+    allPoints = points;
+    currentSubscription = subscription?.price_chf ?? null;
     chart?.destroy();
-    chart = renderBarometer(canvas, tooltipEl, points, subscription);
+    chart = renderBarometer(canvas, tooltipEl, points, subscription, syncMetaForView);
     if (resetBtn) resetBtn.hidden = chart === null;
-    updateMeta(points, subscription?.price_chf ?? null);
+    setActiveRange('all');
+    updateMeta(points, currentSubscription);
   } catch (err) {
     console.error(err);
     document.getElementById('meta-period')!.textContent = '—';
   }
+}
+
+function syncMetaForView(range: { min: number; max: number } | null): void {
+  if (!range) {
+    updateMeta(allPoints, currentSubscription);
+    return;
+  }
+  const visible = allPoints.filter((p) => {
+    const t = new Date(p.published_at).getTime();
+    return Number.isFinite(t) && t >= range.min && t <= range.max;
+  });
+  updateMeta(visible, currentSubscription);
 }
 
 function updateMeta(points: BarometerPoint[], subscription: number | null): void {

@@ -239,6 +239,78 @@ export async function getFlaggedImages(
   return results ?? [];
 }
 
+export interface ImageDiagnostics {
+  article_total: number;
+  article_enriched: number;
+  article_with_hero: number;
+  image_analysis_rows: number;
+  image_with_pop_culture: number;
+  image_with_ai_05_plus: number;
+  image_with_fetch_failed: number;
+  top_ai_likelihoods: Array<{
+    url: string;
+    image_url: string;
+    ai_generated_likelihood: number;
+    published_at: string;
+  }>;
+}
+
+export async function getImageDiagnostics(db: D1Database): Promise<ImageDiagnostics> {
+  const count = async (sql: string): Promise<number> => {
+    const row = await db.prepare(sql).first<{ n: number }>();
+    return row?.n ?? 0;
+  };
+  const [
+    article_total,
+    article_enriched,
+    article_with_hero,
+    image_analysis_rows,
+    image_with_pop_culture,
+    image_with_ai_05_plus,
+    image_with_fetch_failed,
+    topRows,
+  ] = await Promise.all([
+    count(`SELECT COUNT(*) AS n FROM article`),
+    count(`SELECT COUNT(*) AS n FROM article WHERE enriched_at IS NOT NULL`),
+    count(`SELECT COUNT(*) AS n FROM article WHERE hero_image_url IS NOT NULL`),
+    count(`SELECT COUNT(*) AS n FROM image_analysis`),
+    count(`SELECT COUNT(*) AS n FROM image_analysis WHERE pop_culture_source IS NOT NULL`),
+    count(
+      `SELECT COUNT(*) AS n FROM image_analysis
+        WHERE ai_generated_likelihood IS NOT NULL
+          AND ai_generated_likelihood >= 0.5`,
+    ),
+    count(`SELECT COUNT(*) AS n FROM image_analysis WHERE notes LIKE 'fetch_failed:%'`),
+    db
+      .prepare(
+        `SELECT a.url AS url, i.image_url AS image_url,
+                i.ai_generated_likelihood AS ai_generated_likelihood,
+                a.published_at AS published_at
+           FROM image_analysis i
+           JOIN article a ON a.id = i.article_id
+          WHERE i.ai_generated_likelihood IS NOT NULL
+          ORDER BY i.ai_generated_likelihood DESC
+          LIMIT 10`,
+      )
+      .all<{
+        url: string;
+        image_url: string;
+        ai_generated_likelihood: number;
+        published_at: string;
+      }>(),
+  ]);
+  return {
+    article_total,
+    article_enriched,
+    article_with_hero,
+    image_analysis_rows,
+    image_with_pop_culture,
+    image_with_ai_05_plus,
+    image_with_fetch_failed,
+    top_ai_likelihoods: topRows.results ?? [],
+  };
+}
+
 export async function getKeywordFrequencies(
   db: D1Database,
   opts: { kind?: KeywordKind; limit?: number; min_count?: number } = {},

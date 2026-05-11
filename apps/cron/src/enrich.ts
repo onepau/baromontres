@@ -75,9 +75,17 @@ async function callImageEnrichment(
       },
     ];
   } catch (err) {
-    // image fetch can fail (CDN expired, hotlink protection); record nothing
-    console.warn('image enrichment failed', row.url, stringifyError(err));
-    return [];
+    const msg = stringifyError(err);
+    console.warn('image enrichment failed', row.url, msg);
+    return [
+      {
+        image_url: row.hero_image_url,
+        is_hero: true,
+        pop_culture_source: null,
+        ai_generated_likelihood: null,
+        notes: `fetch_failed: ${msg.slice(0, 200)}`,
+      },
+    ];
   }
 }
 

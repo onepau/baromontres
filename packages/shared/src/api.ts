@@ -4,6 +4,7 @@ import {
   getArticleDetail,
   getBarometer,
   getFlaggedImages,
+  getImageDiagnostics,
   getKeywordFrequencies,
   latestSubscriptionPrice,
 } from './queries.ts';
@@ -63,6 +64,11 @@ export function createApi(): Hono<{ Bindings: Env }> {
     const limit = limitParam ? Math.min(50, Math.max(1, Number(limitParam) || 12)) : undefined;
     const flags = await getFlaggedImages(c.env.DB, { limit });
     return c.json({ flags });
+  });
+
+  app.get('/api/diag/images', async (c) => {
+    const diag = await getImageDiagnostics(c.env.DB);
+    return c.json(diag);
   });
 
   return app;
