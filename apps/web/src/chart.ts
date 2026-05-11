@@ -46,6 +46,7 @@ export function renderBarometer(
   tooltipEl: HTMLElement,
   points: BarometerPoint[],
   subscription: SubscriptionPriceRow | null,
+  onViewChange?: (range: { min: number; max: number } | null) => void,
 ): Chart | null {
   if (points.length === 0) {
     canvas.replaceWith(noDataNode());
@@ -138,10 +139,14 @@ export function renderBarometer(
             wheel: { enabled: true },
             pinch: { enabled: true },
             mode: 'xy',
+            onZoom: ({ chart }) => notifyView(chart, onViewChange),
+            onZoomComplete: ({ chart }) => notifyView(chart, onViewChange),
           },
           pan: {
             enabled: true,
             mode: 'xy',
+            onPan: ({ chart }) => notifyView(chart, onViewChange),
+            onPanComplete: ({ chart }) => notifyView(chart, onViewChange),
           },
           limits: {
             x: { minRange: SEVEN_DAYS_MS },
@@ -152,6 +157,22 @@ export function renderBarometer(
   };
 
   return new Chart(canvas, config);
+}
+
+function notifyView(
+  chart: Chart,
+  cb: ((range: { min: number; max: number } | null) => void) | undefined,
+): void {
+  if (!cb) return;
+  const scale = chart.scales.x;
+  if (!scale) return;
+  const min = scale.min;
+  const max = scale.max;
+  if (typeof min !== 'number' || typeof max !== 'number') {
+    cb(null);
+    return;
+  }
+  cb({ min, max });
 }
 
 function renderHtmlTooltip(
