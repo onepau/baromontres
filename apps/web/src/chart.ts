@@ -139,10 +139,14 @@ export function renderBarometer(
             wheel: { enabled: true },
             pinch: { enabled: true },
             mode: 'xy',
+            onZoom: ({ chart }) => notifyView(chart, onViewChange),
+            onZoomComplete: ({ chart }) => notifyView(chart, onViewChange),
           },
           pan: {
             enabled: true,
             mode: 'xy',
+            onPan: ({ chart }) => notifyView(chart, onViewChange),
+            onPanComplete: ({ chart }) => notifyView(chart, onViewChange),
           },
           limits: {
             x: { minRange: SEVEN_DAYS_MS },

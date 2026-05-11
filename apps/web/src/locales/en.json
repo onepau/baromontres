@@ -24,5 +24,8 @@
   "aiBadge": "AI",
   "popCultureOther": "Doctored",
   "trendMonthlyAverage": "Monthly average",
-  "resetZoom": "Reset zoom"
+  "resetZoom": "Reset zoom",
+  "rangeAll": "All",
+  "introTitle": "Tracking the French-language watch press",
+  "introBody": "Baromontres scans businessmontres.com daily to measure the unit price of paywalled articles, editorial sentiment and the brands they mention. Horology readers get a quick read on what's driving the specialist press — from the price of a single dossier to the most-cited brands, plus a sample of doctored or AI-generated images surfaced by our classifier."
 }
