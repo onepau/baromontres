@@ -9,17 +9,20 @@ import {
 import { enrichArticle } from './enrich.ts';
 
 // How to backfill (operator recipe):
+//   <WEB>  = the site host (also serves /api/*), e.g. baromontres.<acc>.workers.dev
+//   <CRON> = the cron worker host, e.g. baromontres-cron.<acc>.workers.dev
+//
 //   # 1. See what we have, by month:
-//   curl https://baromontres-api.<acc>.workers.dev/api/diag/articles_by_month | jq
+//   curl https://<WEB>/api/diag/articles_by_month | jq
 //
 //   # 2. See what's actually on archive page N (read-only, no DB write):
-//   curl https://baromontres-cron.<acc>.workers.dev/probe?page=12 | jq
+//   curl https://<CRON>/probe?page=12 | jq
 //
 //   # 3. Fill the gap by date instead of guessing page numbers:
-//   curl -X POST 'https://baromontres-cron.<acc>.workers.dev/run?start_page=1&pages=50&until_date=2025-05-01&enrich_limit=0'
+//   curl -X POST 'https://<CRON>/run?start_page=1&pages=50&until_date=2025-05-01&enrich_limit=0'
 //
 //   # 4. Drain enrichment afterwards:
-//   curl -X POST 'https://baromontres-cron.<acc>.workers.dev/run?enrich_limit=20'
+//   curl -X POST 'https://<CRON>/run?enrich_limit=20'
 
 interface CronEnv extends Env {
   SCRAPE_LIMIT: string;
