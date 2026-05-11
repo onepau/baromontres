@@ -340,6 +340,10 @@ a {
 /* ---------- Ad slot ---------- */
 
 .ad-slot {
+  display: none;
+}
+
+.ad-slot.is-live {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -354,7 +358,7 @@ a {
   text-transform: uppercase;
 }
 
-.ad-slot ins.adsbygoogle {
+.ad-slot.is-live .ad-placeholder {
   display: none;
 }
 
