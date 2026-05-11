@@ -22,7 +22,6 @@ async function boot(): Promise<void> {
     void renderImageFlags();
   });
   bindResetZoom();
-  bindRangeFilter();
   await Promise.all([renderChart(), renderTopics(), renderImageFlags()]);
 }
 
