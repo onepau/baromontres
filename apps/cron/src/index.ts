@@ -2,6 +2,7 @@ import type { Env } from '@baromontres/shared/schema';
 import { listUnenriched, upsertArticle, existingUrls } from '@baromontres/shared/queries';
 import {
   discoverArticleUrls,
+  discoverFromHomepagePages,
   discoverFromSitemap,
   fetchAndParse,
   probeArchivePage,
@@ -18,13 +19,19 @@ import { enrichArticle } from './enrich.ts';
 //   # 2. See what's actually on archive page N (read-only, no DB write):
 //   curl https://<CRON>/probe?page=12 | jq
 //
-//   # 3. Fill a date range. Only articles whose published_at is in
+//   # 3. Fill a date range from the /archives pages. Only articles whose published_at is in
 //   #    [from_date, to_date] are inserted; the page walk stops once
 //   #    the oldest scraped article drops below from_date. Re-run the
 //   #    same call until {scraped:0} — dedupe handles overlap.
 //   curl -X POST 'https://<CRON>/run?start_page=1&pages=50&from_date=2025-05-01&to_date=2026-03-31&enrich_limit=0&scrape_max=50'
 //
-//   # 4. Drain enrichment afterwards:
+//   # 4. Backfill articles missing from /archives that appear on homepage pagination (?page=N).
+//   #    Walk pages 1..100 in batches; re-run until {scraped:0}.
+//   curl -X POST 'https://<CRON>/run?use_homepage=1&start_page=1&pages=20&enrich_limit=0&scrape_max=50'
+//   curl -X POST 'https://<CRON>/run?use_homepage=1&start_page=21&pages=20&enrich_limit=0&scrape_max=50'
+//   # ... continue until no new articles are found
+//
+//   # 5. Drain enrichment afterwards:
 //   curl -X POST 'https://<CRON>/run?enrich_limit=20'
 
 interface CronEnv extends Env {
@@ -55,13 +62,15 @@ export default {
       const fromDateParam = url.searchParams.get('from_date');
       const toDateParam = url.searchParams.get('to_date');
       const useSitemapParam = url.searchParams.get('use_sitemap');
-      const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
-      const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
+      const useHomepageParam = url.searchParams.get('use_homepage');
+      const pages = pagesParam ? clampInt(pagesParam, 1, 200) : undefined;
+      const startPage = startPageParam ? clampInt(startPageParam, 1, 1000) : undefined;
       const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
       const scrapeMax = scrapeMaxParam ? clampInt(scrapeMaxParam, 1, 500) : undefined;
       const fromDate = parseIsoDate(fromDateParam);
       const toDate = parseIsoDate(toDateParam);
       const useSitemap = useSitemapParam === '1' || useSitemapParam === 'true';
+      const useHomepage = useHomepageParam === '1' || useHomepageParam === 'true';
       // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
       if (
@@ -71,7 +80,8 @@ export default {
         scrapeMax !== undefined ||
         fromDate ||
         toDate ||
-        useSitemap
+        useSitemap ||
+        useHomepage
       ) {
         ctx.waitUntil(
           runPipeline(env, {
@@ -82,6 +92,7 @@ export default {
             fromDate,
             toDate,
             useSitemap,
+            useHomepage,
           }),
         );
         return Response.json({
@@ -93,6 +104,7 @@ export default {
           fromDate,
           toDate,
           useSitemap,
+          useHomepage,
         });
       }
       const result = await runPipeline(env);
@@ -112,6 +124,7 @@ async function runPipeline(
     fromDate?: string;
     toDate?: string;
     useSitemap?: boolean;
+    useHomepage?: boolean;
   } = {},
 ): Promise<{
   discovered: number;
@@ -142,7 +155,7 @@ async function runPipeline(
 
   const seen = await existingUrls(env.DB);
   console.log(
-    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} from=${fromDate ?? '-'} to=${toDate ?? '-'} useSitemap=${opts.useSitemap ? '1' : '0'}`,
+    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} from=${fromDate ?? '-'} to=${toDate ?? '-'} useSitemap=${opts.useSitemap ? '1' : '0'} useHomepage=${opts.useHomepage ? '1' : '0'}`,
   );
 
   let candidates: string[] = [];
@@ -154,6 +167,16 @@ async function runPipeline(
     } else {
       console.log(`discovery: sitemap unavailable, falling back to archives`);
     }
+  }
+  if (candidates.length === 0 && opts.useHomepage) {
+    candidates = await discoverFromHomepagePages(
+      env.SOURCE_BASE,
+      env.USER_AGENT,
+      scrapeLimit,
+      startPage,
+      endPage,
+    );
+    console.log(`discovery via homepage pagination: ${candidates.length} urls`);
   }
   if (candidates.length === 0) {
     candidates = await discoverArticleUrls(
