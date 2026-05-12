@@ -2,6 +2,7 @@ import type { Env } from '@baromontres/shared/schema';
 import { listUnenriched, upsertArticle, existingUrls } from '@baromontres/shared/queries';
 import {
   discoverArticleUrls,
+  discoverFromHomepagePages,
   discoverFromSitemap,
   fetchAndParse,
   probeArchivePage,
@@ -9,17 +10,29 @@ import {
 import { enrichArticle } from './enrich.ts';
 
 // How to backfill (operator recipe):
+//   <WEB>  = the site host (also serves /api/*), e.g. baromontres.<acc>.workers.dev
+//   <CRON> = the cron worker host, e.g. baromontres-cron.<acc>.workers.dev
+//
 //   # 1. See what we have, by month:
-//   curl https://baromontres-api.<acc>.workers.dev/api/diag/articles_by_month | jq
+//   curl https://<WEB>/api/diag/articles_by_month | jq
 //
 //   # 2. See what's actually on archive page N (read-only, no DB write):
-//   curl https://baromontres-cron.<acc>.workers.dev/probe?page=12 | jq
+//   curl https://<CRON>/probe?page=12 | jq
 //
-//   # 3. Fill the gap by date instead of guessing page numbers:
-//   curl -X POST 'https://baromontres-cron.<acc>.workers.dev/run?start_page=1&pages=50&until_date=2025-05-01&enrich_limit=0'
+//   # 3. Fill a date range from the /archives pages. Only articles whose published_at is in
+//   #    [from_date, to_date] are inserted; the page walk stops once
+//   #    the oldest scraped article drops below from_date. Re-run the
+//   #    same call until {scraped:0} — dedupe handles overlap.
+//   curl -X POST 'https://<CRON>/run?start_page=1&pages=50&from_date=2025-05-01&to_date=2026-03-31&enrich_limit=0&scrape_max=50'
 //
-//   # 4. Drain enrichment afterwards:
-//   curl -X POST 'https://baromontres-cron.<acc>.workers.dev/run?enrich_limit=20'
+//   # 4. Backfill articles missing from /archives that appear on homepage pagination (?page=N).
+//   #    Walk pages 1..100 in batches; re-run until {scraped:0}.
+//   curl -X POST 'https://<CRON>/run?use_homepage=1&start_page=1&pages=20&enrich_limit=0&scrape_max=50'
+//   curl -X POST 'https://<CRON>/run?use_homepage=1&start_page=21&pages=20&enrich_limit=0&scrape_max=50'
+//   # ... continue until no new articles are found
+//
+//   # 5. Drain enrichment afterwards:
+//   curl -X POST 'https://<CRON>/run?enrich_limit=20'
 
 interface CronEnv extends Env {
   SCRAPE_LIMIT: string;
@@ -46,16 +59,18 @@ export default {
       const startPageParam = url.searchParams.get('start_page');
       const enrichLimitParam = url.searchParams.get('enrich_limit');
       const scrapeMaxParam = url.searchParams.get('scrape_max');
-      const untilDateParam = url.searchParams.get('until_date');
+      const fromDateParam = url.searchParams.get('from_date');
+      const toDateParam = url.searchParams.get('to_date');
       const useSitemapParam = url.searchParams.get('use_sitemap');
-      const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
-      const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
+      const useHomepageParam = url.searchParams.get('use_homepage');
+      const pages = pagesParam ? clampInt(pagesParam, 1, 200) : undefined;
+      const startPage = startPageParam ? clampInt(startPageParam, 1, 1000) : undefined;
       const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
       const scrapeMax = scrapeMaxParam ? clampInt(scrapeMaxParam, 1, 500) : undefined;
-      const untilDate = untilDateParam && /^\d{4}-\d{2}-\d{2}$/.test(untilDateParam)
-        ? untilDateParam
-        : undefined;
+      const fromDate = parseIsoDate(fromDateParam);
+      const toDate = parseIsoDate(toDateParam);
       const useSitemap = useSitemapParam === '1' || useSitemapParam === 'true';
+      const useHomepage = useHomepageParam === '1' || useHomepageParam === 'true';
       // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
       if (
@@ -63,11 +78,22 @@ export default {
         startPage ||
         enrichLimit !== undefined ||
         scrapeMax !== undefined ||
-        untilDate ||
-        useSitemap
+        fromDate ||
+        toDate ||
+        useSitemap ||
+        useHomepage
       ) {
         ctx.waitUntil(
-          runPipeline(env, { pages, startPage, enrichLimit, scrapeMax, untilDate, useSitemap }),
+          runPipeline(env, {
+            pages,
+            startPage,
+            enrichLimit,
+            scrapeMax,
+            fromDate,
+            toDate,
+            useSitemap,
+            useHomepage,
+          }),
         );
         return Response.json({
           started: true,
@@ -75,8 +101,10 @@ export default {
           pages,
           enrichLimit,
           scrapeMax,
-          untilDate,
+          fromDate,
+          toDate,
           useSitemap,
+          useHomepage,
         });
       }
       const result = await runPipeline(env);
@@ -93,12 +121,15 @@ async function runPipeline(
     startPage?: number;
     enrichLimit?: number;
     scrapeMax?: number;
-    untilDate?: string;
+    fromDate?: string;
+    toDate?: string;
     useSitemap?: boolean;
+    useHomepage?: boolean;
   } = {},
 ): Promise<{
   discovered: number;
   scraped: number;
+  skippedOutOfRange: number;
   enriched: number;
   errors: string[];
 }> {
@@ -112,7 +143,8 @@ async function runPipeline(
   const startPage = opts.startPage ?? 1;
   const pageCount = opts.pages ?? (Number(env.LISTING_PAGES) || 4);
   const endPage = startPage + pageCount - 1;
-  const untilDate = opts.untilDate;
+  const fromDate = opts.fromDate;
+  const toDate = opts.toDate;
 
   // Cloudflare's waitUntil budget for fetch handlers is ~30s. Stop cleanly
   // before the runtime kills us so partial work commits and the next call
@@ -123,7 +155,7 @@ async function runPipeline(
 
   const seen = await existingUrls(env.DB);
   console.log(
-    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} untilDate=${untilDate ?? '-'} useSitemap=${opts.useSitemap ? '1' : '0'}`,
+    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} from=${fromDate ?? '-'} to=${toDate ?? '-'} useSitemap=${opts.useSitemap ? '1' : '0'} useHomepage=${opts.useHomepage ? '1' : '0'}`,
   );
 
   let candidates: string[] = [];
@@ -135,6 +167,16 @@ async function runPipeline(
     } else {
       console.log(`discovery: sitemap unavailable, falling back to archives`);
     }
+  }
+  if (candidates.length === 0 && opts.useHomepage) {
+    candidates = await discoverFromHomepagePages(
+      env.SOURCE_BASE,
+      env.USER_AGENT,
+      scrapeLimit,
+      startPage,
+      endPage,
+    );
+    console.log(`discovery via homepage pagination: ${candidates.length} urls`);
   }
   if (candidates.length === 0) {
     candidates = await discoverArticleUrls(
@@ -155,9 +197,20 @@ async function runPipeline(
   // Process the whole fetch→parse→upsert chain concurrently per batch.
   // Fetch is I/O-bound, parse is CPU-bound, upsert is I/O-bound; running
   // them all in parallel pipelines those phases across articles.
+  // When from_date / to_date are set, the article is parsed but only
+  // upserted if its published_at falls in the range — out-of-range
+  // articles are counted as skipped so the operator can see what's
+  // happening.
   const BATCH_SIZE = 6;
   let scraped = 0;
+  let skippedOutOfRange = 0;
   let oldestSeen: string | null = null;
+  const inRange = (d: string | null | undefined): boolean => {
+    if (!d) return true; // unparseable date — let upsert decide; do not silently drop
+    if (fromDate && d < fromDate) return false;
+    if (toDate && d > toDate) return false;
+    return true;
+  };
   outer: for (let i = 0; i < toScrape.length; i += BATCH_SIZE) {
     if (budgetExceeded()) {
       console.log(`scrape phase: time budget reached at ${scraped}/${toScrape.length}`);
@@ -168,6 +221,13 @@ async function runPipeline(
       batch.map(async (url) => {
         const article = await fetchAndParse(url, env.USER_AGENT);
         if (!article) return { url, kind: 'null' as const };
+        if (!inRange(article.published_at)) {
+          return {
+            url,
+            kind: 'out_of_range' as const,
+            published_at: article.published_at,
+          };
+        }
         await upsertArticle(env.DB, article);
         return { url, kind: 'ok' as const, published_at: article.published_at };
       }),
@@ -185,16 +245,25 @@ async function runPipeline(
         console.warn(`scrape skipped (parse returned null): ${url}`);
         continue;
       }
+      if (r.value.kind === 'out_of_range') {
+        skippedOutOfRange += 1;
+        const pa = r.value.published_at;
+        if (pa && (oldestSeen === null || pa < oldestSeen)) oldestSeen = pa;
+        continue;
+      }
       scraped += 1;
       const pa = r.value.published_at;
       if (pa && (oldestSeen === null || pa < oldestSeen)) oldestSeen = pa;
     }
-    if (untilDate && oldestSeen && oldestSeen < untilDate) {
-      console.log(`scrape phase: until_date=${untilDate} reached (oldest=${oldestSeen})`);
+    // Stop walking pages once we've gone below the lower bound.
+    if (fromDate && oldestSeen && oldestSeen < fromDate) {
+      console.log(`scrape phase: from_date=${fromDate} reached (oldest=${oldestSeen})`);
       break outer;
     }
   }
-  console.log(`scrape phase done: scraped=${scraped}/${toScrape.length} oldest=${oldestSeen ?? '-'}`);
+  console.log(
+    `scrape phase done: scraped=${scraped} out_of_range=${skippedOutOfRange} total=${toScrape.length} oldest=${oldestSeen ?? '-'}`,
+  );
 
   let enriched = 0;
   if (enrichLimit > 0 && !budgetExceeded()) {
@@ -220,10 +289,16 @@ async function runPipeline(
     console.log(`enrich phase: skipped (no time budget remaining)`);
   }
   console.log(
-    `pipeline done: discovered=${candidates.length} scraped=${scraped} enriched=${enriched} errors=${errors.length}`,
+    `pipeline done: discovered=${candidates.length} scraped=${scraped} out_of_range=${skippedOutOfRange} enriched=${enriched} errors=${errors.length}`,
   );
 
-  return { discovered: candidates.length, scraped, enriched, errors };
+  return {
+    discovered: candidates.length,
+    scraped,
+    skippedOutOfRange,
+    enriched,
+    errors,
+  };
 }
 
 function stringifyError(err: unknown): string {
@@ -235,4 +310,9 @@ function clampInt(raw: string, lo: number, hi: number): number {
   const n = Math.floor(Number(raw));
   if (!Number.isFinite(n)) return lo;
   return Math.min(hi, Math.max(lo, n));
+}
+
+function parseIsoDate(raw: string | null): string | undefined {
+  if (!raw) return undefined;
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
 }

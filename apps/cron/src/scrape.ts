@@ -22,6 +22,40 @@ export function isArticleUrl(href: string): boolean {
   return ARTICLE_HREF.test(href) && !STUB_URL.test(href);
 }
 
+export async function discoverFromHomepagePages(
+  sourceBase: string,
+  userAgent: string,
+  limit: number,
+  startPage = 1,
+  endPage = 10,
+): Promise<string[]> {
+  const pageNumbers: number[] = [];
+  for (let n = startPage; n <= endPage; n++) pageNumbers.push(n);
+
+  const results = await Promise.allSettled(
+    pageNumbers.map((n) => {
+      const url = n === 1 ? sourceBase : `${sourceBase}/?page=${n}`;
+      return fetchText(url, userAgent);
+    }),
+  );
+
+  const seen = new Set<string>();
+  for (const r of results) {
+    if (r.status === 'rejected') continue;
+    if (seen.size >= limit) break;
+    const { document } = parseHTML(r.value);
+    for (const a of Array.from(document.querySelectorAll('a[href]'))) {
+      const href = (a as Element).getAttribute('href');
+      if (!href) continue;
+      if (!isArticleUrl(href)) continue;
+      const normalized = normalizeUrl(href);
+      seen.add(normalized);
+      if (seen.size >= limit) break;
+    }
+  }
+  return [...seen];
+}
+
 export async function discoverArticleUrls(
   sourceBase: string,
   userAgent: string,
