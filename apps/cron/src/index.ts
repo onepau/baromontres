@@ -49,7 +49,7 @@ export default {
       const untilDateParam = url.searchParams.get('until_date');
       const useSitemapParam = url.searchParams.get('use_sitemap');
       const pages = pagesParam ? clampInt(pagesParam, 1, 100) : undefined;
-      const startPage = startPageParam ? clampInt(startPageParam, 1, 100) : undefined;
+      const startPage = startPageParam ? clampInt(startPageParam, 1, 1000) : undefined;
       const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
       const scrapeMax = scrapeMaxParam ? clampInt(scrapeMaxParam, 1, 500) : undefined;
       const untilDate = untilDateParam && /^\d{4}-\d{2}-\d{2}$/.test(untilDateParam)
