@@ -1,4 +1,8 @@
-import type { BarometerPoint, KeywordKind, SubscriptionPriceRow } from '@baromontres/shared/schema';
+import type {
+  BarometerPoint,
+  KeywordKind,
+  SubscriptionPriceRow,
+} from "@baromontres/shared/schema";
 
 export interface BarometerResponse {
   points: BarometerPoint[];
@@ -20,11 +24,18 @@ export interface FlaggedImage {
   image_url: string;
   pop_culture_source: string | null;
   ai_generated_likelihood: number | null;
+  not_watch_image: 0 | 1 | null;
+  has_text_overlay: 0 | 1 | null;
+  source_clue: string | null;
   notes: string | null;
 }
 
-export async function fetchBarometer(since?: string): Promise<BarometerResponse> {
-  const url = since ? `/api/barometer?since=${encodeURIComponent(since)}` : '/api/barometer';
+export async function fetchBarometer(
+  since?: string,
+): Promise<BarometerResponse> {
+  const url = since
+    ? `/api/barometer?since=${encodeURIComponent(since)}`
+    : "/api/barometer";
   const res = await fetch(url);
   if (!res.ok) throw new Error(`barometer ${res.status}`);
   return res.json();
@@ -36,8 +47,8 @@ export async function fetchKeywords(
   minCount?: number,
 ): Promise<KeywordFreq[]> {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (kind) params.set('kind', kind);
-  if (minCount && minCount > 1) params.set('min_count', String(minCount));
+  if (kind) params.set("kind", kind);
+  if (minCount && minCount > 1) params.set("min_count", String(minCount));
   const res = await fetch(`/api/keywords?${params.toString()}`);
   if (!res.ok) throw new Error(`keywords ${res.status}`);
   const data = (await res.json()) as { frequencies: KeywordFreq[] };

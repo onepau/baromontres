@@ -8,7 +8,7 @@ import type {
   SentimentLabel,
   SentimentRow,
   SubscriptionPriceRow,
-} from './schema.ts';
+} from "./schema.ts";
 
 export interface ScrapedArticle {
   url: string;
@@ -21,7 +21,10 @@ export interface ScrapedArticle {
   hero_image_url: string | null;
 }
 
-export async function upsertArticle(db: D1Database, a: ScrapedArticle): Promise<number> {
+export async function upsertArticle(
+  db: D1Database,
+  a: ScrapedArticle,
+): Promise<number> {
   const now = new Date().toISOString();
   const result = await db
     .prepare(
@@ -55,7 +58,10 @@ export async function upsertArticle(db: D1Database, a: ScrapedArticle): Promise<
   return result.id;
 }
 
-export async function listUnenriched(db: D1Database, limit: number): Promise<ArticleRow[]> {
+export async function listUnenriched(
+  db: D1Database,
+  limit: number,
+): Promise<ArticleRow[]> {
   const { results } = await db
     .prepare(
       `SELECT * FROM article WHERE enriched_at IS NULL ORDER BY published_at DESC LIMIT ?`,
@@ -66,7 +72,9 @@ export async function listUnenriched(db: D1Database, limit: number): Promise<Art
 }
 
 export async function existingUrls(db: D1Database): Promise<Set<string>> {
-  const { results } = await db.prepare(`SELECT url FROM article`).all<{ url: string }>();
+  const { results } = await db
+    .prepare(`SELECT url FROM article`)
+    .all<{ url: string }>();
   return new Set((results ?? []).map((r) => r.url));
 }
 
@@ -79,15 +87,23 @@ export interface EnrichmentInput {
     is_hero: boolean;
     pop_culture_source: string | null;
     ai_generated_likelihood: number | null;
+    not_watch_image: boolean | null;
+    has_text_overlay: boolean | null;
+    source_clue: string | null;
     notes: string | null;
   }>;
 }
 
-export async function persistEnrichment(db: D1Database, e: EnrichmentInput): Promise<void> {
+export async function persistEnrichment(
+  db: D1Database,
+  e: EnrichmentInput,
+): Promise<void> {
   const now = new Date().toISOString();
   const stmts: D1PreparedStatement[] = [
     db.prepare(`DELETE FROM keyword WHERE article_id = ?`).bind(e.article_id),
-    db.prepare(`DELETE FROM image_analysis WHERE article_id = ?`).bind(e.article_id),
+    db
+      .prepare(`DELETE FROM image_analysis WHERE article_id = ?`)
+      .bind(e.article_id),
     db
       .prepare(
         `INSERT INTO sentiment (article_id, label, score, rationale)
@@ -95,12 +111,19 @@ export async function persistEnrichment(db: D1Database, e: EnrichmentInput): Pro
          ON CONFLICT(article_id) DO UPDATE SET
            label = excluded.label, score = excluded.score, rationale = excluded.rationale`,
       )
-      .bind(e.article_id, e.sentiment.label, e.sentiment.score, e.sentiment.rationale),
+      .bind(
+        e.article_id,
+        e.sentiment.label,
+        e.sentiment.score,
+        e.sentiment.rationale,
+      ),
   ];
   for (const k of e.keywords) {
     stmts.push(
       db
-        .prepare(`INSERT INTO keyword (article_id, term, term_en, kind) VALUES (?, ?, ?, ?)`)
+        .prepare(
+          `INSERT INTO keyword (article_id, term, term_en, kind) VALUES (?, ?, ?, ?)`,
+        )
         .bind(e.article_id, k.term, k.term_en, k.kind),
     );
   }
@@ -109,8 +132,9 @@ export async function persistEnrichment(db: D1Database, e: EnrichmentInput): Pro
       db
         .prepare(
           `INSERT INTO image_analysis (article_id, image_url, is_hero, pop_culture_source,
-                                       ai_generated_likelihood, notes)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+                                       ai_generated_likelihood, not_watch_image,
+                                       has_text_overlay, source_clue, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           e.article_id,
@@ -118,11 +142,18 @@ export async function persistEnrichment(db: D1Database, e: EnrichmentInput): Pro
           i.is_hero ? 1 : 0,
           i.pop_culture_source,
           i.ai_generated_likelihood,
+          i.not_watch_image === null ? null : i.not_watch_image ? 1 : 0,
+          i.has_text_overlay === null ? null : i.has_text_overlay ? 1 : 0,
+          i.source_clue,
           i.notes,
         ),
     );
   }
-  stmts.push(db.prepare(`UPDATE article SET enriched_at = ? WHERE id = ?`).bind(now, e.article_id));
+  stmts.push(
+    db
+      .prepare(`UPDATE article SET enriched_at = ? WHERE id = ?`)
+      .bind(now, e.article_id),
+  );
   await db.batch(stmts);
 }
 
@@ -130,7 +161,7 @@ export async function getBarometer(
   db: D1Database,
   opts: { since?: string; limit?: number } = {},
 ): Promise<BarometerPoint[]> {
-  const since = opts.since ?? '1970-01-01';
+  const since = opts.since ?? "1970-01-01";
   const limit = opts.limit ?? 1000;
   const { results } = await db
     .prepare(
@@ -159,7 +190,9 @@ export async function latestSubscriptionPrice(
   db: D1Database,
 ): Promise<SubscriptionPriceRow | null> {
   return db
-    .prepare(`SELECT * FROM subscription_price ORDER BY observed_at DESC LIMIT 1`)
+    .prepare(
+      `SELECT * FROM subscription_price ORDER BY observed_at DESC LIMIT 1`,
+    )
     .first<SubscriptionPriceRow>();
 }
 
@@ -172,20 +205,23 @@ export async function getArticleDetail(
     .bind(id)
     .first<ArticleRow>();
   if (!article) return null;
-  const [{ results: keywords }, sentiment, { results: images }] = await Promise.all([
-    db
-      .prepare(`SELECT * FROM keyword WHERE article_id = ? ORDER BY kind, term`)
-      .bind(id)
-      .all<KeywordRow>(),
-    db
-      .prepare(`SELECT * FROM sentiment WHERE article_id = ?`)
-      .bind(id)
-      .first<SentimentRow>(),
-    db
-      .prepare(`SELECT * FROM image_analysis WHERE article_id = ?`)
-      .bind(id)
-      .all<ImageAnalysisRow>(),
-  ]);
+  const [{ results: keywords }, sentiment, { results: images }] =
+    await Promise.all([
+      db
+        .prepare(
+          `SELECT * FROM keyword WHERE article_id = ? ORDER BY kind, term`,
+        )
+        .bind(id)
+        .all<KeywordRow>(),
+      db
+        .prepare(`SELECT * FROM sentiment WHERE article_id = ?`)
+        .bind(id)
+        .first<SentimentRow>(),
+      db
+        .prepare(`SELECT * FROM image_analysis WHERE article_id = ?`)
+        .bind(id)
+        .all<ImageAnalysisRow>(),
+    ]);
   return {
     ...article,
     keywords: keywords ?? [],
@@ -209,6 +245,9 @@ export interface FlaggedImage {
   image_url: string;
   pop_culture_source: string | null;
   ai_generated_likelihood: number | null;
+  not_watch_image: 0 | 1 | null;
+  has_text_overlay: 0 | 1 | null;
+  source_clue: string | null;
   notes: string | null;
 }
 
@@ -224,13 +263,19 @@ export async function getFlaggedImages(
               a.title         AS title,
               a.published_at  AS published_at,
               i.image_url     AS image_url,
-              i.pop_culture_source AS pop_culture_source,
+              i.pop_culture_source     AS pop_culture_source,
               i.ai_generated_likelihood AS ai_generated_likelihood,
-              i.notes         AS notes
+              i.not_watch_image        AS not_watch_image,
+              i.has_text_overlay       AS has_text_overlay,
+              i.source_clue            AS source_clue,
+              i.notes                  AS notes
          FROM image_analysis i
          JOIN article a ON a.id = i.article_id
         WHERE i.pop_culture_source IS NOT NULL
            OR (i.ai_generated_likelihood IS NOT NULL AND i.ai_generated_likelihood >= 0.5)
+           OR i.not_watch_image = 1
+           OR i.has_text_overlay = 1
+           OR i.source_clue IS NOT NULL
         ORDER BY a.published_at DESC
         LIMIT ?`,
     )
@@ -246,6 +291,9 @@ export interface ImageDiagnostics {
   image_analysis_rows: number;
   image_with_pop_culture: number;
   image_with_ai_05_plus: number;
+  image_with_not_watch: number;
+  image_with_text_overlay: number;
+  image_with_source_clue: number;
   image_with_fetch_failed: number;
   top_ai_likelihoods: Array<{
     url: string;
@@ -255,7 +303,9 @@ export interface ImageDiagnostics {
   }>;
 }
 
-export async function getImageDiagnostics(db: D1Database): Promise<ImageDiagnostics> {
+export async function getImageDiagnostics(
+  db: D1Database,
+): Promise<ImageDiagnostics> {
   const count = async (sql: string): Promise<number> => {
     const row = await db.prepare(sql).first<{ n: number }>();
     return row?.n ?? 0;
@@ -267,6 +317,9 @@ export async function getImageDiagnostics(db: D1Database): Promise<ImageDiagnost
     image_analysis_rows,
     image_with_pop_culture,
     image_with_ai_05_plus,
+    image_with_not_watch,
+    image_with_text_overlay,
+    image_with_source_clue,
     image_with_fetch_failed,
     topRows,
   ] = await Promise.all([
@@ -274,13 +327,24 @@ export async function getImageDiagnostics(db: D1Database): Promise<ImageDiagnost
     count(`SELECT COUNT(*) AS n FROM article WHERE enriched_at IS NOT NULL`),
     count(`SELECT COUNT(*) AS n FROM article WHERE hero_image_url IS NOT NULL`),
     count(`SELECT COUNT(*) AS n FROM image_analysis`),
-    count(`SELECT COUNT(*) AS n FROM image_analysis WHERE pop_culture_source IS NOT NULL`),
+    count(
+      `SELECT COUNT(*) AS n FROM image_analysis WHERE pop_culture_source IS NOT NULL`,
+    ),
     count(
       `SELECT COUNT(*) AS n FROM image_analysis
         WHERE ai_generated_likelihood IS NOT NULL
           AND ai_generated_likelihood >= 0.5`,
     ),
-    count(`SELECT COUNT(*) AS n FROM image_analysis WHERE notes LIKE 'fetch_failed:%'`),
+    count(`SELECT COUNT(*) AS n FROM image_analysis WHERE not_watch_image = 1`),
+    count(
+      `SELECT COUNT(*) AS n FROM image_analysis WHERE has_text_overlay = 1`,
+    ),
+    count(
+      `SELECT COUNT(*) AS n FROM image_analysis WHERE source_clue IS NOT NULL`,
+    ),
+    count(
+      `SELECT COUNT(*) AS n FROM image_analysis WHERE notes LIKE 'fetch_failed:%'`,
+    ),
     db
       .prepare(
         `SELECT a.url AS url, i.image_url AS image_url,
@@ -306,6 +370,9 @@ export async function getImageDiagnostics(db: D1Database): Promise<ImageDiagnost
     image_analysis_rows,
     image_with_pop_culture,
     image_with_ai_05_plus,
+    image_with_not_watch,
+    image_with_text_overlay,
+    image_with_source_clue,
     image_with_fetch_failed,
     top_ai_likelihoods: topRows.results ?? [],
   };
@@ -317,7 +384,9 @@ export interface ArticleMonthRow {
   with_price: number;
 }
 
-export async function getArticlesByMonth(db: D1Database): Promise<ArticleMonthRow[]> {
+export async function getArticlesByMonth(
+  db: D1Database,
+): Promise<ArticleMonthRow[]> {
   const { results } = await db
     .prepare(
       `SELECT substr(published_at, 1, 7) AS month,
@@ -338,8 +407,8 @@ export async function getKeywordFrequencies(
 ): Promise<KeywordFrequency[]> {
   const limit = opts.limit ?? 50;
   const minCount = opts.min_count ?? 1;
-  const where = opts.kind ? `WHERE kind = ?` : '';
-  const having = minCount > 1 ? `HAVING COUNT(DISTINCT article_id) >= ?` : '';
+  const where = opts.kind ? `WHERE kind = ?` : "";
+  const having = minCount > 1 ? `HAVING COUNT(DISTINCT article_id) >= ?` : "";
   const stmt = db.prepare(
     `SELECT term, term_en, kind, COUNT(DISTINCT article_id) AS article_count
        FROM keyword

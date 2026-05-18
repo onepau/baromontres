@@ -1,6 +1,6 @@
-export type SentimentLabel = 'positive' | 'neutral' | 'negative';
-export type KeywordKind = 'brand' | 'topic' | 'person' | 'model';
-export type SubscriptionPeriod = 'monthly' | 'yearly';
+export type SentimentLabel = "positive" | "neutral" | "negative";
+export type KeywordKind = "brand" | "topic" | "person" | "model";
+export type SubscriptionPeriod = "monthly" | "yearly";
 
 export interface ArticleRow {
   id: number;
@@ -38,6 +38,9 @@ export interface ImageAnalysisRow {
   is_hero: 0 | 1;
   pop_culture_source: string | null;
   ai_generated_likelihood: number | null;
+  not_watch_image: 0 | 1 | null;
+  has_text_overlay: 0 | 1 | null;
+  source_clue: string | null;
   notes: string | null;
 }
 
@@ -68,4 +71,5 @@ export interface ArticleDetail extends ArticleRow {
 export interface Env {
   DB: D1Database;
   ANTHROPIC_API_KEY: string;
+  GOOGLE_VISION_API_KEY: string;
 }

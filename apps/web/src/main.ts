@@ -1,14 +1,14 @@
-import 'chartjs-adapter-date-fns';
-import { applyDom, bindLangSwitch, getLang, setLang, t } from './i18n.ts';
+import "chartjs-adapter-date-fns";
+import { applyDom, bindLangSwitch, getLang, setLang, t } from "./i18n.ts";
 import {
   fetchBarometer,
   fetchFlaggedImages,
   fetchKeywords,
   type FlaggedImage,
-} from './api.ts';
-import { renderBarometer } from './chart.ts';
-import type { BarometerPoint } from '@baromontres/shared/schema';
-import type { Chart } from 'chart.js';
+} from "./api.ts";
+import { renderBarometer } from "./chart.ts";
+import type { BarometerPoint } from "@baromontres/shared/schema";
+import type { Chart } from "chart.js";
 
 let chart: Chart | null = null;
 let allPoints: BarometerPoint[] = [];
@@ -27,16 +27,18 @@ async function boot(): Promise<void> {
 }
 
 function bindResetZoom(): void {
-  const btn = document.getElementById('reset-zoom');
-  btn?.addEventListener('click', () => {
+  const btn = document.getElementById("reset-zoom");
+  btn?.addEventListener("click", () => {
     chart?.resetZoom();
-    setActiveRange('all');
+    setActiveRange("all");
   });
 }
 
 function bindRangeFilter(): void {
-  for (const btn of document.querySelectorAll<HTMLButtonElement>('.range-filter button')) {
-    btn.addEventListener('click', () => {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    ".range-filter button",
+  )) {
+    btn.addEventListener("click", () => {
       const range = btn.dataset.range;
       if (!range) return;
       applyRange(range);
@@ -47,43 +49,63 @@ function bindRangeFilter(): void {
 
 function applyRange(range: string): void {
   if (!chart || allPoints.length === 0) return;
-  if (range === 'all') {
+  if (range === "all") {
     chart.resetZoom();
     return;
   }
-  const months: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12 };
+  const months: Record<string, number> = {
+    "1m": 1,
+    "3m": 3,
+    "6m": 6,
+    "1y": 12,
+  };
   const m = months[range];
   if (!m) return;
-  const last = new Date(allPoints[allPoints.length - 1]!.published_at).getTime();
+  const last = new Date(
+    allPoints[allPoints.length - 1]!.published_at,
+  ).getTime();
   if (!Number.isFinite(last)) return;
   const start = new Date(last);
   start.setMonth(start.getMonth() - m);
-  chart.zoomScale('x', { min: start.getTime(), max: last }, 'default');
+  chart.zoomScale("x", { min: start.getTime(), max: last }, "default");
 }
 
 function setActiveRange(range: string): void {
-  for (const btn of document.querySelectorAll<HTMLButtonElement>('.range-filter button')) {
-    btn.setAttribute('aria-pressed', btn.dataset.range === range ? 'true' : 'false');
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    ".range-filter button",
+  )) {
+    btn.setAttribute(
+      "aria-pressed",
+      btn.dataset.range === range ? "true" : "false",
+    );
   }
 }
 
 async function renderChart(): Promise<void> {
-  const canvas = document.getElementById('barometer') as HTMLCanvasElement | null;
-  const tooltipEl = document.getElementById('tooltip');
-  const resetBtn = document.getElementById('reset-zoom');
+  const canvas = document.getElementById(
+    "barometer",
+  ) as HTMLCanvasElement | null;
+  const tooltipEl = document.getElementById("tooltip");
+  const resetBtn = document.getElementById("reset-zoom");
   if (!canvas || !tooltipEl) return;
   try {
     const { points, subscription } = await fetchBarometer();
     allPoints = points;
     currentSubscription = subscription?.price_chf ?? null;
     chart?.destroy();
-    chart = renderBarometer(canvas, tooltipEl, points, subscription, syncMetaForView);
+    chart = renderBarometer(
+      canvas,
+      tooltipEl,
+      points,
+      subscription,
+      syncMetaForView,
+    );
     if (resetBtn) resetBtn.hidden = chart === null;
-    setActiveRange('all');
+    setActiveRange("all");
     updateMeta(points, currentSubscription);
   } catch (err) {
     console.error(err);
-    document.getElementById('meta-period')!.textContent = '—';
+    document.getElementById("meta-period")!.textContent = "—";
   }
 }
 
@@ -99,19 +121,25 @@ function syncMetaForView(range: { min: number; max: number } | null): void {
   updateMeta(visible, currentSubscription);
 }
 
-function updateMeta(points: BarometerPoint[], subscription: number | null): void {
-  const period = document.getElementById('meta-period')!;
-  const avg = document.getElementById('meta-average')!;
-  const count = document.getElementById('meta-count')!;
-  const sub = document.getElementById('meta-subscription')!;
+function updateMeta(
+  points: BarometerPoint[],
+  subscription: number | null,
+): void {
+  const period = document.getElementById("meta-period")!;
+  const avg = document.getElementById("meta-average")!;
+  const count = document.getElementById("meta-count")!;
+  const sub = document.getElementById("meta-subscription")!;
   if (points.length === 0) {
-    period.textContent = '—';
-    avg.textContent = '—';
-    count.textContent = '0';
-    sub.textContent = subscription !== null ? `${subscription.toFixed(2)} CHF` : '—';
+    period.textContent = "—";
+    avg.textContent = "—";
+    count.textContent = "0";
+    sub.textContent =
+      subscription !== null ? `${subscription.toFixed(2)} CHF` : "—";
     return;
   }
-  const sorted = [...points].sort((a, b) => a.published_at.localeCompare(b.published_at));
+  const sorted = [...points].sort((a, b) =>
+    a.published_at.localeCompare(b.published_at),
+  );
   const start = sorted[0]!.published_at;
   const end = sorted[sorted.length - 1]!.published_at;
   const lang = getLang();
@@ -120,17 +148,18 @@ function updateMeta(points: BarometerPoint[], subscription: number | null): void
     points.reduce((acc, p) => acc + p.unit_price_chf, 0) / points.length;
   avg.textContent = `${mean.toFixed(2)} CHF`;
   count.textContent = String(points.length);
-  sub.textContent = subscription !== null ? `${subscription.toFixed(2)} CHF` : '—';
+  sub.textContent =
+    subscription !== null ? `${subscription.toFixed(2)} CHF` : "—";
 }
 
 async function renderTopics(): Promise<void> {
-  const brandsEl = document.getElementById('brands');
-  const topicsEl = document.getElementById('topics');
+  const brandsEl = document.getElementById("brands");
+  const topicsEl = document.getElementById("topics");
   if (!brandsEl || !topicsEl) return;
   try {
     const [brands, topics] = await Promise.all([
-      fetchKeywords('brand', 30),
-      fetchKeywords('topic', 30, 4),
+      fetchKeywords("brand", 30),
+      fetchKeywords("topic", 30, 4),
     ]);
     brandsEl.replaceChildren(...brands.map(chipNode));
     topicsEl.replaceChildren(...topics.map(chipNode));
@@ -139,29 +168,33 @@ async function renderTopics(): Promise<void> {
   }
 }
 
-function chipNode(k: { term: string; term_en: string | null; article_count: number }): HTMLElement {
-  const span = document.createElement('span');
-  span.className = 'chip';
+function chipNode(k: {
+  term: string;
+  term_en: string | null;
+  article_count: number;
+}): HTMLElement {
+  const span = document.createElement("span");
+  span.className = "chip";
   const lang = getLang();
-  const label = lang === 'en' && k.term_en ? k.term_en : k.term;
+  const label = lang === "en" && k.term_en ? k.term_en : k.term;
   span.append(label);
-  const count = document.createElement('span');
-  count.className = 'count';
+  const count = document.createElement("span");
+  count.className = "count";
   count.textContent = String(k.article_count);
   span.append(count);
   return span;
 }
 
 async function renderImageFlags(): Promise<void> {
-  const list = document.getElementById('image-flags-list');
-  const empty = document.getElementById('image-flags-empty');
+  const list = document.getElementById("image-flags-list");
+  const empty = document.getElementById("image-flags-empty");
   if (!list) return;
   try {
     const flags = await fetchFlaggedImages(12);
     if (flags.length === 0) {
       list.replaceChildren();
       if (empty) {
-        empty.textContent = t('imageFlagsEmpty');
+        empty.textContent = t("imageFlagsEmpty");
         empty.hidden = false;
       }
       return;
@@ -174,42 +207,61 @@ async function renderImageFlags(): Promise<void> {
 }
 
 function flagNode(f: FlaggedImage): HTMLElement {
-  const li = document.createElement('li');
+  const li = document.createElement("li");
 
-  const img = document.createElement('img');
-  img.className = 'flag-thumb';
+  const img = document.createElement("img");
+  img.className = "flag-thumb";
   img.src = f.image_url;
-  img.alt = '';
-  img.loading = 'lazy';
-  img.referrerPolicy = 'no-referrer';
+  img.alt = "";
+  img.loading = "lazy";
+  img.referrerPolicy = "no-referrer";
 
-  const body = document.createElement('div');
-  body.className = 'flag-body';
+  const body = document.createElement("div");
+  body.className = "flag-body";
 
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = f.url;
-  a.target = '_blank';
-  a.rel = 'noopener';
+  a.target = "_blank";
+  a.rel = "noopener";
   a.textContent = f.title;
   body.append(a);
 
-  const meta = document.createElement('div');
-  meta.className = 'flag-meta';
+  const meta = document.createElement("div");
+  meta.className = "flag-meta";
   meta.textContent = formatShortDate(f.published_at, getLang());
   body.append(meta);
 
-  const badges = document.createElement('div');
-  badges.className = 'flag-badges';
+  const badges = document.createElement("div");
+  badges.className = "flag-badges";
   if (f.pop_culture_source) {
-    const b = document.createElement('span');
-    b.className = 'badge badge-pop';
+    const b = document.createElement("span");
+    b.className = "badge badge-pop";
     b.textContent = popCultureLabel(f.pop_culture_source);
     badges.append(b);
   }
   if (f.ai_generated_likelihood !== null && f.ai_generated_likelihood >= 0.5) {
-    const b = document.createElement('span');
-    b.className = 'badge badge-ai';
-    b.textContent = `${t('aiBadge')} ${Math.round(f.ai_generated_likelihood * 100)}%`;
+    const b = document.createElement("span");
+    b.className = "badge badge-ai";
+    b.textContent = `${t("aiBadge")} ${Math.round(f.ai_generated_likelihood * 100)}%`;
+    badges.append(b);
+  }
+  if (f.not_watch_image === 1) {
+    const b = document.createElement("span");
+    b.className = "badge badge-notwatch";
+    b.textContent = t("notWatchBadge");
+    badges.append(b);
+  }
+  if (f.has_text_overlay === 1) {
+    const b = document.createElement("span");
+    b.className = "badge badge-overlay";
+    b.textContent = t("textOverlayBadge");
+    badges.append(b);
+  }
+  if (f.source_clue) {
+    const b = document.createElement("span");
+    b.className = "badge badge-source";
+    b.title = f.source_clue;
+    b.textContent = t("sourceClueBadge");
     badges.append(b);
   }
   body.append(badges);
@@ -220,23 +272,23 @@ function flagNode(f: FlaggedImage): HTMLElement {
 
 function popCultureLabel(src: string): string {
   const map: Record<string, string> = {
-    peanuts: 'Peanuts',
-    tintin: 'Tintin',
-    asterix: 'Astérix',
-    gaston: 'Gaston',
-    calvin_hobbes: 'Calvin & Hobbes',
-    other: t('popCultureOther'),
+    peanuts: "Peanuts",
+    tintin: "Tintin",
+    asterix: "Astérix",
+    gaston: "Gaston",
+    calvin_hobbes: "Calvin & Hobbes",
+    other: t("popCultureOther"),
   };
   return map[src] ?? src;
 }
 
-function formatShortDate(iso: string, lang: 'fr' | 'en'): string {
+function formatShortDate(iso: string, lang: "fr" | "en"): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 

@@ -18,6 +18,7 @@ database_name = "baromontres"
 database_id = "40793010-0c4d-4a80-a1af-963a50273fc5"
 
 # Set with: wrangler secret put ANTHROPIC_API_KEY
+# Set with: wrangler secret put GOOGLE_VISION_API_KEY
 # vars are not used; secrets only.
 
 [vars]

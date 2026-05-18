@@ -28,39 +28,36 @@ Règles :
 - "topic" = sujet général (enchères, salon, contrefaçon, prix, marketing…).
 - Si l'aperçu est insuffisant, fais au mieux et baisse le score |score| en conséquence.`;
 
-export const IMAGE_ENRICH_SYSTEM = `Tu analyses l'image d'illustration d'un article de presse horlogère francophone. Beaucoup d'articles de businessmontres.com utilisent des images détournées de bandes dessinées (Peanuts, Tintin, Astérix, Gaston Lagaffe, etc.) ou des images générées par IA.
-
-Renvoie STRICTEMENT cet objet JSON :
+export const IMAGE_ENRICH_SYSTEM = `You analyse an image from a French watchmaking press article where automated web detection found no clear match. Determine the following and return STRICTLY this JSON:
 
 {
-  "pop_culture_source": "peanuts" | "tintin" | "asterix" | "gaston" | "calvin_hobbes" | "other" | null,
+  "not_watch_image": boolean,
+  "has_text_overlay": boolean,
   "ai_generated_likelihood": number (0..1),
-  "notes": string (1 phrase en français)
+  "notes": string (1 sentence in English)
 }
 
-Règles :
-- "pop_culture_source" = null si l'image est une photo réelle de montre / personne / événement.
-- "other" si bande dessinée non listée.
-- "ai_generated_likelihood" 0 = clairement humain/photo, 1 = clairement IA. Indices d'IA : mains déformées, texte illisible, détails fondus, sur-lissage, asymétrie incohérente.`;
+Rules:
+- "not_watch_image" = true if the image does not primarily show a watch, movement, watchmaker, or watchmaking event.
+- "has_text_overlay" = true if a caption, slogan, or subtitle has been visually superimposed — exclude text native to a watch dial or an official brand advertisement.
+- "ai_generated_likelihood": 0 = clearly real photo, 1 = clearly AI. Indicators: deformed hands, illegible text, melted details, over-smoothing, incoherent asymmetry.`;
 
 export interface TextEnrichmentResponse {
-  sentiment: { label: 'positive' | 'neutral' | 'negative'; score: number; rationale: string };
+  sentiment: {
+    label: "positive" | "neutral" | "negative";
+    score: number;
+    rationale: string;
+  };
   keywords: Array<{
     term: string;
     term_en: string | null;
-    kind: 'brand' | 'topic' | 'person' | 'model';
+    kind: "brand" | "topic" | "person" | "model";
   }>;
 }
 
 export interface ImageEnrichmentResponse {
-  pop_culture_source:
-    | 'peanuts'
-    | 'tintin'
-    | 'asterix'
-    | 'gaston'
-    | 'calvin_hobbes'
-    | 'other'
-    | null;
+  not_watch_image: boolean;
+  has_text_overlay: boolean;
   ai_generated_likelihood: number;
   notes: string;
 }
