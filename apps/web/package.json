@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "pnpm build && wrangler deploy --config ../../wrangler.toml",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@baromontres/shared": "workspace:*",

@@ -254,11 +254,23 @@ function flagNode(f: FlaggedImage): HTMLElement {
     badges.append(b);
   }
   if (f.source_clue) {
-    const b = document.createElement("span");
-    b.className = "badge badge-source";
-    b.title = f.source_clue;
-    b.textContent = t("sourceClueBadge");
-    badges.append(b);
+    const urlMatch = f.source_clue.match(/https?:\/\/\S+/);
+    if (urlMatch) {
+      const a = document.createElement("a");
+      a.className = "badge badge-source";
+      a.href = urlMatch[0];
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.title = f.source_clue;
+      a.textContent = t("sourceClueBadge");
+      badges.append(a);
+    } else {
+      const b = document.createElement("span");
+      b.className = "badge badge-source";
+      b.title = f.source_clue;
+      b.textContent = t("sourceClueBadge");
+      badges.append(b);
+    }
   }
   body.append(badges);
 
