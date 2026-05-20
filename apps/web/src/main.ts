@@ -205,22 +205,22 @@ async function renderImageFlags(): Promise<void> {
 function flagNode(f: FlaggedImage): HTMLElement {
   const li = document.createElement("li");
 
+  const imgLink = document.createElement("a");
+  imgLink.href = f.url;
+  imgLink.target = "_blank";
+  imgLink.rel = "noopener";
+  imgLink.setAttribute("aria-label", f.title);
+
   const img = document.createElement("img");
   img.className = "flag-thumb";
   img.src = f.image_url;
-  img.alt = "";
+  img.alt = f.title;
   img.loading = "lazy";
   img.referrerPolicy = "no-referrer";
+  imgLink.append(img);
 
   const body = document.createElement("div");
   body.className = "flag-body";
-
-  const a = document.createElement("a");
-  a.href = f.url;
-  a.target = "_blank";
-  a.rel = "noopener";
-  a.textContent = f.title;
-  body.append(a);
 
   const meta = document.createElement("div");
   meta.className = "flag-meta";
@@ -274,7 +274,7 @@ function flagNode(f: FlaggedImage): HTMLElement {
   }
   body.append(badges);
 
-  li.append(img, body);
+  li.append(imgLink, body);
   return li;
 }
 

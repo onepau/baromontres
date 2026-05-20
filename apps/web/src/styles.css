@@ -551,11 +551,11 @@ a {
 }
 
 .flag-thumb {
-  width: 56px;
-  height: 56px;
+  width: 88px;
+  height: 88px;
   flex-shrink: 0;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 50%;
   background: var(--bg-2);
 }
 
