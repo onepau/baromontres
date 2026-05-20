@@ -202,6 +202,17 @@ async function renderImageFlags(): Promise<void> {
   }
 }
 
+const NON_STATIC_HOSTS =
+  /\b(youtube\.com|youtu\.be|vimeo\.com|tiktok\.com|instagram\.com|twitter\.com|x\.com|facebook\.com|dailymotion\.com|twitch\.tv)\b/i;
+
+function isStaticImageSource(url: string): boolean {
+  try {
+    return !NON_STATIC_HOSTS.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 function flagNode(f: FlaggedImage): HTMLElement {
   const li = document.createElement("li");
 
@@ -229,33 +240,9 @@ function flagNode(f: FlaggedImage): HTMLElement {
 
   const badges = document.createElement("div");
   badges.className = "flag-badges";
-  if (f.pop_culture_source) {
-    const b = document.createElement("span");
-    b.className = "badge badge-pop";
-    b.textContent = popCultureLabel(f.pop_culture_source);
-    badges.append(b);
-  }
-  if (f.ai_generated_likelihood !== null && f.ai_generated_likelihood >= 0.5) {
-    const b = document.createElement("span");
-    b.className = "badge badge-ai";
-    b.textContent = `${t("aiBadge")} ${Math.round(f.ai_generated_likelihood * 100)}%`;
-    badges.append(b);
-  }
-  if (f.not_watch_image === 1) {
-    const b = document.createElement("span");
-    b.className = "badge badge-notwatch";
-    b.textContent = t("notWatchBadge");
-    badges.append(b);
-  }
-  if (f.has_text_overlay === 1) {
-    const b = document.createElement("span");
-    b.className = "badge badge-overlay";
-    b.textContent = t("textOverlayBadge");
-    badges.append(b);
-  }
   if (f.source_clue) {
     const urlMatch = f.source_clue.match(/https?:\/\/\S+/);
-    if (urlMatch) {
+    if (urlMatch && isStaticImageSource(urlMatch[0])) {
       const a = document.createElement("a");
       a.className = "badge badge-source";
       a.href = urlMatch[0];
@@ -264,12 +251,6 @@ function flagNode(f: FlaggedImage): HTMLElement {
       a.title = f.source_clue;
       a.textContent = t("sourceClueBadge");
       badges.append(a);
-    } else {
-      const b = document.createElement("span");
-      b.className = "badge badge-source";
-      b.title = f.source_clue;
-      b.textContent = t("sourceClueBadge");
-      badges.append(b);
     }
   }
   body.append(badges);
