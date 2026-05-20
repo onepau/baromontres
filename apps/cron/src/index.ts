@@ -1,13 +1,17 @@
-import type { Env } from '@baromontres/shared/schema';
-import { listUnenriched, upsertArticle, existingUrls } from '@baromontres/shared/queries';
+import type { Env } from "@baromontres/shared/schema";
+import {
+  listUnenriched,
+  upsertArticle,
+  existingUrls,
+} from "@baromontres/shared/queries";
 import {
   discoverArticleUrls,
   discoverFromHomepagePages,
   discoverFromSitemap,
   fetchAndParse,
   probeArchivePage,
-} from './scrape.ts';
-import { enrichArticle } from './enrich.ts';
+} from "./scrape.ts";
+import { enrichArticle } from "./enrich.ts";
 
 // How to backfill (operator recipe):
 //   <WEB>  = the site host (also serves /api/*), e.g. baromontres.<acc>.workers.dev
@@ -18,6 +22,9 @@ import { enrichArticle } from './enrich.ts';
 //
 //   # 2. See what's actually on archive page N (read-only, no DB write):
 //   curl https://<CRON>/probe?page=12 | jq
+//
+//   # 2b. Scrape (and optionally enrich) a single article URL:
+//   curl -X POST 'https://<CRON>/scrape?url=https://businessmontres.com/article/...&enrich=1' | jq
 //
 //   # 3. Fill a date range from the /archives pages. Only articles whose published_at is in
 //   #    [from_date, to_date] are inserted; the page walk stops once
@@ -43,34 +50,53 @@ interface CronEnv extends Env {
 }
 
 export default {
-  async scheduled(_event: ScheduledEvent, env: CronEnv, ctx: ExecutionContext): Promise<void> {
+  async scheduled(
+    _event: ScheduledEvent,
+    env: CronEnv,
+    ctx: ExecutionContext,
+  ): Promise<void> {
     ctx.waitUntil(runPipeline(env));
   },
-  async fetch(req: Request, env: CronEnv, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    req: Request,
+    env: CronEnv,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(req.url);
-    if (url.pathname === '/probe' && req.method === 'GET') {
-      const pageParam = url.searchParams.get('page');
+    if (url.pathname === "/probe" && req.method === "GET") {
+      const pageParam = url.searchParams.get("page");
       const page = pageParam ? clampInt(pageParam, 1, 1000) : 1;
-      const result = await probeArchivePage(env.SOURCE_BASE, env.USER_AGENT, page);
+      const result = await probeArchivePage(
+        env.SOURCE_BASE,
+        env.USER_AGENT,
+        page,
+      );
       return Response.json(result);
     }
-    if (url.pathname === '/run' && req.method === 'POST') {
-      const pagesParam = url.searchParams.get('pages');
-      const startPageParam = url.searchParams.get('start_page');
-      const enrichLimitParam = url.searchParams.get('enrich_limit');
-      const scrapeMaxParam = url.searchParams.get('scrape_max');
-      const fromDateParam = url.searchParams.get('from_date');
-      const toDateParam = url.searchParams.get('to_date');
-      const useSitemapParam = url.searchParams.get('use_sitemap');
-      const useHomepageParam = url.searchParams.get('use_homepage');
+    if (url.pathname === "/run" && req.method === "POST") {
+      const pagesParam = url.searchParams.get("pages");
+      const startPageParam = url.searchParams.get("start_page");
+      const enrichLimitParam = url.searchParams.get("enrich_limit");
+      const scrapeMaxParam = url.searchParams.get("scrape_max");
+      const fromDateParam = url.searchParams.get("from_date");
+      const toDateParam = url.searchParams.get("to_date");
+      const useSitemapParam = url.searchParams.get("use_sitemap");
+      const useHomepageParam = url.searchParams.get("use_homepage");
       const pages = pagesParam ? clampInt(pagesParam, 1, 200) : undefined;
-      const startPage = startPageParam ? clampInt(startPageParam, 1, 1000) : undefined;
-      const enrichLimit = enrichLimitParam ? clampInt(enrichLimitParam, 0, 500) : undefined;
-      const scrapeMax = scrapeMaxParam ? clampInt(scrapeMaxParam, 1, 500) : undefined;
+      const startPage = startPageParam
+        ? clampInt(startPageParam, 1, 1000)
+        : undefined;
+      const enrichLimit = enrichLimitParam
+        ? clampInt(enrichLimitParam, 0, 500)
+        : undefined;
+      const scrapeMax = scrapeMaxParam
+        ? clampInt(scrapeMaxParam, 1, 500)
+        : undefined;
       const fromDate = parseIsoDate(fromDateParam);
       const toDate = parseIsoDate(toDateParam);
-      const useSitemap = useSitemapParam === '1' || useSitemapParam === 'true';
-      const useHomepage = useHomepageParam === '1' || useHomepageParam === 'true';
+      const useSitemap = useSitemapParam === "1" || useSitemapParam === "true";
+      const useHomepage =
+        useHomepageParam === "1" || useHomepageParam === "true";
       // Backfill runs much longer than the 30s response budget.
       // Detach via waitUntil and acknowledge synchronously.
       if (
@@ -110,7 +136,27 @@ export default {
       const result = await runPipeline(env);
       return Response.json(result);
     }
-    return new Response('baromontres cron worker', { status: 200 });
+    if (url.pathname === "/scrape" && req.method === "POST") {
+      const articleUrl = url.searchParams.get("url");
+      if (!articleUrl)
+        return Response.json({ error: "missing ?url=" }, { status: 400 });
+      const enrich = url.searchParams.get("enrich") === "1";
+      const article = await fetchAndParse(articleUrl, env.USER_AGENT);
+      if (!article)
+        return Response.json({ error: "parse returned null" }, { status: 422 });
+      await upsertArticle(env.DB, article);
+      let enriched = false;
+      if (enrich) {
+        const rows = await listUnenriched(env.DB, 50);
+        const row = rows.find((r) => r.url === article.url);
+        if (row) {
+          await enrichArticle(env, row);
+          enriched = true;
+        }
+      }
+      return Response.json({ scraped: article, enriched });
+    }
+    return new Response("baromontres cron worker", { status: 200 });
   },
 };
 
@@ -155,7 +201,7 @@ async function runPipeline(
 
   const seen = await existingUrls(env.DB);
   console.log(
-    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} from=${fromDate ?? '-'} to=${toDate ?? '-'} useSitemap=${opts.useSitemap ? '1' : '0'} useHomepage=${opts.useHomepage ? '1' : '0'}`,
+    `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} from=${fromDate ?? "-"} to=${toDate ?? "-"} useSitemap=${opts.useSitemap ? "1" : "0"} useHomepage=${opts.useHomepage ? "1" : "0"}`,
   );
 
   let candidates: string[] = [];
@@ -163,7 +209,9 @@ async function runPipeline(
     const sm = await discoverFromSitemap(env.SOURCE_BASE, env.USER_AGENT);
     if (sm) {
       candidates = sm.urls.slice(0, scrapeLimit);
-      console.log(`discovery via sitemap (${sm.source}): ${sm.urls.length} urls`);
+      console.log(
+        `discovery via sitemap (${sm.source}): ${sm.urls.length} urls`,
+      );
     } else {
       console.log(`discovery: sitemap unavailable, falling back to archives`);
     }
@@ -213,39 +261,41 @@ async function runPipeline(
   };
   outer: for (let i = 0; i < toScrape.length; i += BATCH_SIZE) {
     if (budgetExceeded()) {
-      console.log(`scrape phase: time budget reached at ${scraped}/${toScrape.length}`);
+      console.log(
+        `scrape phase: time budget reached at ${scraped}/${toScrape.length}`,
+      );
       break;
     }
     const batch = toScrape.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
       batch.map(async (url) => {
         const article = await fetchAndParse(url, env.USER_AGENT);
-        if (!article) return { url, kind: 'null' as const };
+        if (!article) return { url, kind: "null" as const };
         if (!inRange(article.published_at)) {
           return {
             url,
-            kind: 'out_of_range' as const,
+            kind: "out_of_range" as const,
             published_at: article.published_at,
           };
         }
         await upsertArticle(env.DB, article);
-        return { url, kind: 'ok' as const, published_at: article.published_at };
+        return { url, kind: "ok" as const, published_at: article.published_at };
       }),
     );
     for (let j = 0; j < settled.length; j++) {
       const url = batch[j]!;
       const r = settled[j]!;
-      if (r.status === 'rejected') {
+      if (r.status === "rejected") {
         const msg = stringifyError(r.reason);
         console.error(`scrape failed: ${url} :: ${msg}`);
         errors.push(`scrape ${url}: ${msg}`);
         continue;
       }
-      if (r.value.kind === 'null') {
+      if (r.value.kind === "null") {
         console.warn(`scrape skipped (parse returned null): ${url}`);
         continue;
       }
-      if (r.value.kind === 'out_of_range') {
+      if (r.value.kind === "out_of_range") {
         skippedOutOfRange += 1;
         const pa = r.value.published_at;
         if (pa && (oldestSeen === null || pa < oldestSeen)) oldestSeen = pa;
@@ -257,21 +307,27 @@ async function runPipeline(
     }
     // Stop walking pages once we've gone below the lower bound.
     if (fromDate && oldestSeen && oldestSeen < fromDate) {
-      console.log(`scrape phase: from_date=${fromDate} reached (oldest=${oldestSeen})`);
+      console.log(
+        `scrape phase: from_date=${fromDate} reached (oldest=${oldestSeen})`,
+      );
       break outer;
     }
   }
   console.log(
-    `scrape phase done: scraped=${scraped} out_of_range=${skippedOutOfRange} total=${toScrape.length} oldest=${oldestSeen ?? '-'}`,
+    `scrape phase done: scraped=${scraped} out_of_range=${skippedOutOfRange} total=${toScrape.length} oldest=${oldestSeen ?? "-"}`,
   );
 
   let enriched = 0;
   if (enrichLimit > 0 && !budgetExceeded()) {
     const pending = await listUnenriched(env.DB, enrichLimit);
-    console.log(`enrich phase: pending=${pending.length} (limit=${enrichLimit})`);
+    console.log(
+      `enrich phase: pending=${pending.length} (limit=${enrichLimit})`,
+    );
     for (const row of pending) {
       if (budgetExceeded()) {
-        console.log(`enrich phase: time budget reached at ${enriched}/${pending.length}`);
+        console.log(
+          `enrich phase: time budget reached at ${enriched}/${pending.length}`,
+        );
         break;
       }
       try {

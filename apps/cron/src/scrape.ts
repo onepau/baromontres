@@ -267,7 +267,7 @@ export function parseArticleHtml(
     : extractText(contentEl, 8000);
   const full_text = is_paywalled ? null : extractText(contentEl, 50000);
 
-  const hero_image_url = findHeroImage(document, contentEl);
+  const hero_image_url = findHeroImage(document, contentEl, url);
 
   return {
     url: normalizeUrl(url),
@@ -329,7 +329,11 @@ function extractPreview(el: Element | null, max: number): string | null {
   return trimmed.slice(0, max) || null;
 }
 
-function findHeroImage(doc: Document, content: Element | null): string | null {
+function findHeroImage(
+  doc: Document,
+  content: Element | null,
+  pageUrl: string,
+): string | null {
   const og = doc
     .querySelector('meta[property="og:image"]')
     ?.getAttribute("content");
@@ -340,11 +344,12 @@ function findHeroImage(doc: Document, content: Element | null): string | null {
   if (twitter) return twitter;
   // Try the content area first, then fall back to any storage-hosted image in the document.
   const contentImg = content?.querySelector("img[src]")?.getAttribute("src");
-  if (contentImg) return contentImg;
+  if (contentImg) return absolutize(contentImg, pageUrl) ?? contentImg;
   const storageImg = doc
     .querySelector('img[src*="/storage/app/uploads/public/"]')
     ?.getAttribute("src");
-  return storageImg ?? null;
+  if (storageImg) return absolutize(storageImg, pageUrl) ?? storageImg;
+  return null;
 }
 
 function collapse(s: string): string {
