@@ -178,10 +178,6 @@ function chipNode(k: {
   const lang = getLang();
   const label = lang === "en" && k.term_en ? k.term_en : k.term;
   span.append(label);
-  const count = document.createElement("span");
-  count.className = "count";
-  count.textContent = String(k.article_count);
-  span.append(count);
   return span;
 }
 
