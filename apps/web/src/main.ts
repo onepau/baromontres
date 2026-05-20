@@ -186,8 +186,13 @@ async function renderImageFlags(): Promise<void> {
   const empty = document.getElementById("image-flags-empty");
   if (!list) return;
   try {
-    const flags = await fetchFlaggedImages(12);
-    if (flags.length === 0) {
+    const flags = await fetchFlaggedImages(50);
+    const withSource = flags.filter((f) => {
+      if (!f.source_clue) return false;
+      const m = f.source_clue.match(/https?:\/\/\S+/);
+      return m ? isStaticImageSource(m[0]) : false;
+    });
+    if (withSource.length === 0) {
       list.replaceChildren();
       if (empty) {
         empty.textContent = t("imageFlagsEmpty");
@@ -196,7 +201,7 @@ async function renderImageFlags(): Promise<void> {
       return;
     }
     if (empty) empty.hidden = true;
-    list.replaceChildren(...flags.map(flagNode));
+    list.replaceChildren(...withSource.slice(0, 12).map(flagNode));
   } catch (err) {
     console.error(err);
   }
