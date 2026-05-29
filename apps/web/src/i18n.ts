@@ -9,7 +9,12 @@ const STORAGE_KEY = 'baromontres.lang';
 
 let current: Lang = pickInitial();
 
+function isEnPath(pathname: string): boolean {
+  return pathname === '/en' || pathname.startsWith('/en/');
+}
+
 function pickInitial(): Lang {
+  if (typeof window !== 'undefined' && isEnPath(window.location.pathname)) return 'en';
   if (typeof localStorage === 'undefined') return 'fr';
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === 'fr' || stored === 'en') return stored;
@@ -26,6 +31,11 @@ export function setLang(lang: Lang): void {
   if (typeof localStorage !== 'undefined') localStorage.setItem(STORAGE_KEY, lang);
   document.documentElement.lang = lang;
   applyDom();
+  if (typeof window !== 'undefined') {
+    const onEn = isEnPath(window.location.pathname);
+    if (lang === 'en' && !onEn) window.location.assign('/en');
+    else if (lang === 'fr' && onEn) window.location.assign('/');
+  }
 }
 
 export function t(key: DictKey | string, lang: Lang = current): string {

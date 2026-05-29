@@ -1,4 +1,8 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   root: 'src',
@@ -7,6 +11,12 @@ export default defineConfig({
     outDir: '../dist',
     emptyOutDir: true,
     target: 'es2022',
+    rollupOptions: {
+      input: {
+        main: resolve(here, 'src/index.html'),
+        en: resolve(here, 'src/en/index.html'),
+      },
+    },
   },
   server: {
     port: 5173,
