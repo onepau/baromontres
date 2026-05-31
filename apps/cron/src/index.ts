@@ -3,6 +3,7 @@ import {
   listUnenriched,
   upsertArticle,
   existingUrls,
+  getArticleByUrl,
 } from "@baromontres/shared/queries";
 import {
   discoverArticleUrls,
@@ -141,14 +142,20 @@ export default {
       if (!articleUrl)
         return Response.json({ error: "missing ?url=" }, { status: 400 });
       const enrich = url.searchParams.get("enrich") === "1";
+      const forceEnrich = url.searchParams.get("force_enrich") === "1";
       const article = await fetchAndParse(articleUrl, env.USER_AGENT);
       if (!article)
         return Response.json({ error: "parse returned null" }, { status: 422 });
       await upsertArticle(env.DB, article);
       let enriched = false;
-      if (enrich) {
-        const rows = await listUnenriched(env.DB, 50);
-        const row = rows.find((r) => r.url === article.url);
+      if (enrich || forceEnrich) {
+        let row = null;
+        if (forceEnrich) {
+          row = await getArticleByUrl(env.DB, article.url);
+        } else {
+          const rows = await listUnenriched(env.DB, 50);
+          row = rows.find((r) => r.url === article.url) ?? null;
+        }
         if (row) {
           await enrichArticle(env, row);
           enriched = true;

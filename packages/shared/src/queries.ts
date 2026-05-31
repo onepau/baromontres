@@ -71,6 +71,18 @@ export async function listUnenriched(
   return results ?? [];
 }
 
+export async function getArticleByUrl(
+  db: D1Database,
+  url: string,
+): Promise<ArticleRow | null> {
+  return (
+    db
+      .prepare(`SELECT * FROM article WHERE url = ?`)
+      .bind(url)
+      .first<ArticleRow>() ?? null
+  );
+}
+
 export async function existingUrls(db: D1Database): Promise<Set<string>> {
   const { results } = await db
     .prepare(`SELECT url FROM article`)
@@ -376,6 +388,49 @@ export async function getImageDiagnostics(
     image_with_fetch_failed,
     top_ai_likelihoods: topRows.results ?? [],
   };
+}
+
+export interface RecentImageRow {
+  article_id: number;
+  url: string;
+  title: string;
+  published_at: string;
+  enriched_at: string;
+  image_url: string;
+  pop_culture_source: string | null;
+  ai_generated_likelihood: number | null;
+  not_watch_image: 0 | 1 | null;
+  has_text_overlay: 0 | 1 | null;
+  source_clue: string | null;
+  notes: string | null;
+}
+
+export async function getRecentImageAssessments(
+  db: D1Database,
+  limit = 5,
+): Promise<RecentImageRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT a.id           AS article_id,
+              a.url          AS url,
+              a.title        AS title,
+              a.published_at AS published_at,
+              a.enriched_at  AS enriched_at,
+              i.image_url    AS image_url,
+              i.pop_culture_source      AS pop_culture_source,
+              i.ai_generated_likelihood AS ai_generated_likelihood,
+              i.not_watch_image         AS not_watch_image,
+              i.has_text_overlay        AS has_text_overlay,
+              i.source_clue             AS source_clue,
+              i.notes                   AS notes
+         FROM image_analysis i
+         JOIN article a ON a.id = i.article_id
+        ORDER BY a.enriched_at DESC
+        LIMIT ?`,
+    )
+    .bind(limit)
+    .all<RecentImageRow>();
+  return results ?? [];
 }
 
 export interface ArticleMonthRow {
