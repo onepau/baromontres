@@ -61,3 +61,47 @@ export async function fetchFlaggedImages(limit = 12): Promise<FlaggedImage[]> {
   const data = (await res.json()) as { flags: FlaggedImage[] };
   return data.flags;
 }
+
+export interface PaywallStats {
+  since: string;
+  paywalled_count: number;
+  free_count: number;
+  priced_paywalled_count: number;
+  total_unit_price_chf: number;
+  avg_unit_price_chf: number | null;
+  subscription_tiers: Record<string, number>;
+}
+
+export async function fetchPaywall(since?: string): Promise<PaywallStats> {
+  const url = since
+    ? `/api/paywall?since=${encodeURIComponent(since)}`
+    : "/api/paywall";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`paywall ${res.status}`);
+  return res.json();
+}
+
+export interface BrandLeaderboardRow {
+  term: string;
+  term_en: string | null;
+  article_count: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  avg_score: number | null;
+  net_sentiment: number;
+}
+
+export async function fetchBrands(
+  limit = 20,
+  minCount = 3,
+): Promise<BrandLeaderboardRow[]> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    min_count: String(minCount),
+  });
+  const res = await fetch(`/api/brands?${params.toString()}`);
+  if (!res.ok) throw new Error(`brands ${res.status}`);
+  const data = (await res.json()) as { brands: BrandLeaderboardRow[] };
+  return data.brands;
+}

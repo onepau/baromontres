@@ -2,8 +2,11 @@ import "chartjs-adapter-date-fns";
 import { applyDom, bindLangSwitch, getLang, setLang, t } from "./i18n.ts";
 import {
   fetchBarometer,
+  fetchBrands,
   fetchFlaggedImages,
   fetchKeywords,
+  fetchPaywall,
+  type BrandLeaderboardRow,
   type FlaggedImage,
 } from "./api.ts";
 import { renderBarometer } from "./chart.ts";
@@ -13,6 +16,16 @@ import type { Chart } from "chart.js";
 let chart: Chart | null = null;
 let allPoints: BarometerPoint[] = [];
 let currentSubscription: number | null = null;
+let currentPaywallPeriod = "monthly";
+let brandRows: BrandLeaderboardRow[] = [];
+
+const PAYWALL_PERIOD_DAYS: Record<string, number> = {
+  weekly: 7,
+  monthly: 30,
+  quarterly: 90,
+  annual: 365,
+  annual_supporter: 365,
+};
 
 async function boot(): Promise<void> {
   setLang(getLang());
@@ -20,10 +33,25 @@ async function boot(): Promise<void> {
     applyDom();
     void renderTopics();
     void renderImageFlags();
+    void renderPaywallMeter(currentPaywallPeriod);
+    void renderBrandLeaderboard();
   });
   bindResetZoom();
   bindRangeFilter();
-  await Promise.all([renderChart(), renderTopics(), renderImageFlags()]);
+  bindPaywallPeriods();
+  bindBrandTabs();
+  await Promise.all([
+    renderChart(),
+    renderTopics(),
+    renderImageFlags(),
+    renderPaywallMeter(),
+    renderBrandLeaderboard(),
+  ]);
+}
+
+function setText(id: string, value: string): void {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
 }
 
 function bindResetZoom(): void {
@@ -152,16 +180,127 @@ function updateMeta(
     subscription !== null ? `${subscription.toFixed(2)} CHF` : "—";
 }
 
-async function renderTopics(): Promise<void> {
-  const brandsEl = document.getElementById("brands");
-  const topicsEl = document.getElementById("topics");
-  if (!brandsEl || !topicsEl) return;
+async function renderPaywallMeter(period = "monthly"): Promise<void> {
+  const days = PAYWALL_PERIOD_DAYS[period] ?? 30;
+  const since = new Date(Date.now() - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   try {
-    const [brands, topics] = await Promise.all([
-      fetchKeywords("brand", 30),
-      fetchKeywords("topic", 30, 4),
-    ]);
-    brandsEl.replaceChildren(...brands.map(chipNode));
+    const stats = await fetchPaywall(since);
+    const fmt = (n: number) =>
+      new Intl.NumberFormat(getLang() === "fr" ? "fr-CH" : "en-CH", {
+        style: "currency",
+        currency: "CHF",
+        maximumFractionDigits: 0,
+      }).format(n);
+    const tierPrice = stats.subscription_tiers[period] ?? null;
+    const multiple =
+      tierPrice && tierPrice > 0
+        ? stats.total_unit_price_chf / tierPrice
+        : null;
+    setText("paywall-total", fmt(stats.total_unit_price_chf));
+    setText("paywall-sub", tierPrice != null ? fmt(tierPrice) : "—");
+    setText(
+      "paywall-multiple",
+      multiple != null ? `${multiple.toFixed(1)}×` : "—",
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function bindPaywallPeriods(): void {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    ".paywall-periods button",
+  )) {
+    btn.addEventListener("click", () => {
+      const period = btn.dataset.period ?? "monthly";
+      currentPaywallPeriod = period;
+      void renderPaywallMeter(period);
+      for (const b of document.querySelectorAll<HTMLButtonElement>(
+        ".paywall-periods button",
+      )) {
+        b.setAttribute(
+          "aria-pressed",
+          b.dataset.period === period ? "true" : "false",
+        );
+      }
+    });
+  }
+}
+
+async function renderBrandLeaderboard(view = "coverage"): Promise<void> {
+  if (brandRows.length === 0) {
+    try {
+      brandRows = await fetchBrands(20, 3);
+    } catch (err) {
+      console.error(err);
+      return;
+    }
+  }
+  const rows = [...brandRows];
+  if (view === "positive")
+    rows.sort((a, b) => b.net_sentiment - a.net_sentiment);
+  else if (view === "negative")
+    rows.sort((a, b) => a.net_sentiment - b.net_sentiment);
+  else rows.sort((a, b) => b.article_count - a.article_count);
+
+  const list = document.getElementById("brand-list");
+  if (!list) return;
+  const en = getLang() === "en";
+  list.replaceChildren(
+    ...rows.slice(0, 12).map((r, i) => {
+      const li = document.createElement("li");
+
+      const rank = document.createElement("span");
+      rank.className = "brand-rank";
+      rank.textContent = String(i + 1);
+
+      const name = document.createElement("span");
+      name.className = "brand-name";
+      name.textContent = en && r.term_en ? r.term_en : r.term;
+
+      const countEl = document.createElement("span");
+      countEl.className = "brand-count";
+      countEl.textContent = String(r.article_count);
+
+      const pct = Math.round(r.net_sentiment * 100);
+      const net = document.createElement("span");
+      net.className = "brand-net";
+      net.textContent = pct > 0 ? `+${pct}` : String(pct);
+      net.dataset.positive = pct > 0 ? "true" : "false";
+      net.dataset.negative = pct < 0 ? "true" : "false";
+
+      li.append(rank, name, countEl, net);
+      return li;
+    }),
+  );
+}
+
+function bindBrandTabs(): void {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    ".brand-tabs button",
+  )) {
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view ?? "coverage";
+      void renderBrandLeaderboard(view);
+      for (const b of document.querySelectorAll<HTMLButtonElement>(
+        ".brand-tabs button",
+      )) {
+        b.setAttribute(
+          "aria-pressed",
+          b.dataset.view === view ? "true" : "false",
+        );
+      }
+    });
+  }
+}
+
+async function renderTopics(): Promise<void> {
+  const topicsEl = document.getElementById("topics");
+  if (!topicsEl) return;
+  try {
+    const topics = await fetchKeywords("topic", 30, 4);
     topicsEl.replaceChildren(...topics.map(chipNode));
   } catch (err) {
     console.error(err);
@@ -262,18 +401,6 @@ function flagNode(f: FlaggedImage): HTMLElement {
 
   li.append(imgLink, body);
   return li;
-}
-
-function popCultureLabel(src: string): string {
-  const map: Record<string, string> = {
-    peanuts: "Peanuts",
-    tintin: "Tintin",
-    asterix: "Astérix",
-    gaston: "Gaston",
-    calvin_hobbes: "Calvin & Hobbes",
-    other: t("popCultureOther"),
-  };
-  return map[src] ?? src;
 }
 
 function formatShortDate(iso: string, lang: "fr" | "en"): string {

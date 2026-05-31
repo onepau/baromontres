@@ -4,9 +4,11 @@ import {
   getArticleDetail,
   getArticlesByMonth,
   getBarometer,
+  getBrandLeaderboard,
   getFlaggedImages,
   getImageDiagnostics,
   getKeywordFrequencies,
+  getPaywallStats,
   getRecentImageAssessments,
   latestSubscriptionPrice,
 } from "./queries.ts";
@@ -95,6 +97,30 @@ export function createApi(): Hono<{ Bindings: Env }> {
   app.get("/api/diag/articles_by_month", async (c) => {
     const months = await getArticlesByMonth(c.env.DB);
     return c.json({ months });
+  });
+
+  app.get("/api/paywall", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const stats = await getPaywallStats(c.env.DB, { since });
+    return c.json(stats);
+  });
+
+  app.get("/api/brands", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const limitParam = c.req.query("limit");
+    const minCountParam = c.req.query("min_count");
+    const limit = limitParam
+      ? Math.min(100, Math.max(1, Number(limitParam)))
+      : undefined;
+    const min_count = minCountParam
+      ? Math.min(50, Math.max(1, Number(minCountParam) || 3))
+      : undefined;
+    const brands = await getBrandLeaderboard(c.env.DB, {
+      since,
+      limit,
+      min_count,
+    });
+    return c.json({ brands });
   });
 
   return app;

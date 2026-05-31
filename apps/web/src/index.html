@@ -12,20 +12,36 @@
     <link rel="canonical" href="https://tick-ticker.com/" />
     <link rel="alternate" hreflang="fr" href="https://tick-ticker.com/" />
     <link rel="alternate" hreflang="en" href="https://tick-ticker.com/en" />
-    <link rel="alternate" hreflang="x-default" href="https://tick-ticker.com/" />
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://tick-ticker.com/"
+    />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tick ticker" />
-    <meta property="og:title" content="Tick ticker — Baromètre de la presse horlogère francophone" />
-    <meta property="og:description" content="Baromètre de prix et d'humeur des articles de businessmontres.com" />
+    <meta
+      property="og:title"
+      content="Tick ticker — Baromètre de la presse horlogère francophone"
+    />
+    <meta
+      property="og:description"
+      content="Baromètre de prix et d'humeur des articles de businessmontres.com"
+    />
     <meta property="og:url" content="https://tick-ticker.com/" />
     <meta property="og:image" content="https://tick-ticker.com/og.png" />
     <meta property="og:locale" content="fr_FR" />
     <meta property="og:locale:alternate" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Tick ticker — Baromètre de la presse horlogère francophone" />
-    <meta name="twitter:description" content="Baromètre de prix et d'humeur des articles de businessmontres.com" />
+    <meta
+      name="twitter:title"
+      content="Tick ticker — Baromètre de la presse horlogère francophone"
+    />
+    <meta
+      name="twitter:description"
+      content="Baromètre de prix et d'humeur des articles de businessmontres.com"
+    />
     <meta name="twitter:image" content="https://tick-ticker.com/og.png" />
 
     <script type="application/ld+json">
@@ -36,14 +52,27 @@
         "description": "Baromètre de prix et d'humeur des articles de la presse horlogère francophone, mis à jour quotidiennement à partir de businessmontres.com.",
         "url": "https://tick-ticker.com/",
         "inLanguage": "fr",
-        "keywords": ["montres", "presse horlogère", "businessmontres.com", "prix", "analyse de sentiment", "baromètre"],
+        "keywords": [
+          "montres",
+          "presse horlogère",
+          "businessmontres.com",
+          "prix",
+          "analyse de sentiment",
+          "baromètre"
+        ],
         "isAccessibleForFree": true,
-        "creator": { "@type": "Organization", "name": "Tick ticker", "url": "https://tick-ticker.com" },
-        "distribution": [{
-          "@type": "DataDownload",
-          "encodingFormat": "application/json",
-          "contentUrl": "https://tick-ticker.com/api/barometer"
-        }]
+        "creator": {
+          "@type": "Organization",
+          "name": "Tick ticker",
+          "url": "https://tick-ticker.com"
+        },
+        "distribution": [
+          {
+            "@type": "DataDownload",
+            "encodingFormat": "application/json",
+            "contentUrl": "https://tick-ticker.com/api/barometer"
+          }
+        ]
       }
     </script>
 
@@ -65,6 +94,34 @@
       <section class="intro" aria-label="about">
         <h2 data-i18n="introTitle"></h2>
         <p data-i18n="introBody"></p>
+      </section>
+
+      <section class="paywall-meter" aria-label="paywall meter">
+        <h2 data-i18n="paywallTitle"></h2>
+        <nav class="paywall-periods" aria-label="subscription period">
+          <button data-period="weekly" aria-pressed="false">W</button>
+          <button data-period="monthly" aria-pressed="true">M</button>
+          <button data-period="quarterly" aria-pressed="false">Q</button>
+          <button data-period="annual" aria-pressed="false">Y</button>
+          <button data-period="annual_supporter" aria-pressed="false">
+            S+
+          </button>
+        </nav>
+        <div class="paywall-grid">
+          <div class="paywall-stat">
+            <strong id="paywall-total">…</strong>
+            <span data-i18n="paywallTotalLabel"></span>
+          </div>
+          <div class="paywall-stat">
+            <strong id="paywall-sub">…</strong>
+            <span data-i18n="paywallSubLabel"></span>
+          </div>
+          <div class="paywall-stat paywall-headline">
+            <strong id="paywall-multiple">…</strong>
+            <span data-i18n="paywallMultipleLabel"></span>
+          </div>
+        </div>
+        <p class="paywall-caption" data-i18n="paywallCaption"></p>
       </section>
 
       <section class="chart-section">
@@ -91,10 +148,20 @@
           <button data-range="3m" type="button" aria-pressed="false">3M</button>
           <button data-range="6m" type="button" aria-pressed="false">6M</button>
           <button data-range="1y" type="button" aria-pressed="false">1Y</button>
-          <button data-range="all" type="button" aria-pressed="true" data-i18n="rangeAll"></button>
+          <button
+            data-range="all"
+            type="button"
+            aria-pressed="true"
+            data-i18n="rangeAll"
+          ></button>
         </nav>
         <div class="chart-wrap">
-          <canvas id="barometer" width="1024" height="420" aria-label="price barometer"></canvas>
+          <canvas
+            id="barometer"
+            width="1024"
+            height="420"
+            aria-label="price barometer"
+          ></canvas>
           <button
             id="reset-zoom"
             class="reset-zoom"
@@ -105,11 +172,26 @@
           <div id="tooltip" class="tooltip" hidden></div>
         </div>
         <ul class="legend" aria-label="sentiment legend">
-          <li><span class="dot dot-positive"></span><span data-i18n="positive"></span></li>
-          <li><span class="dot dot-neutral"></span><span data-i18n="neutral"></span></li>
-          <li><span class="dot dot-negative"></span><span data-i18n="negative"></span></li>
-          <li><span class="dot dot-unknown"></span><span data-i18n="unknown"></span></li>
-          <li><span class="dash dash-trend"></span><span data-i18n="trendMonthlyAverage"></span></li>
+          <li>
+            <span class="dot dot-positive"></span
+            ><span data-i18n="positive"></span>
+          </li>
+          <li>
+            <span class="dot dot-neutral"></span
+            ><span data-i18n="neutral"></span>
+          </li>
+          <li>
+            <span class="dot dot-negative"></span
+            ><span data-i18n="negative"></span>
+          </li>
+          <li>
+            <span class="dot dot-unknown"></span
+            ><span data-i18n="unknown"></span>
+          </li>
+          <li>
+            <span class="dash dash-trend"></span
+            ><span data-i18n="trendMonthlyAverage"></span>
+          </li>
         </ul>
       </section>
 
@@ -123,7 +205,7 @@
       <aside id="ad-slot-home" class="ad-slot" aria-label="advertisement">
         <ins
           class="adsbygoogle"
-          style="display:block"
+          style="display: block"
           data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
           data-ad-slot="XXXXXXXXXX"
           data-ad-format="auto"
@@ -132,9 +214,29 @@
         <span class="ad-placeholder" data-i18n="adPlaceholder"></span>
       </aside>
 
-      <section class="topics">
+      <section class="brand-leaderboard" aria-label="brand leaderboard">
         <h2 data-i18n="brandsTitle"></h2>
-        <div id="brands" class="chips"></div>
+        <nav class="brand-tabs" aria-label="leaderboard view">
+          <button
+            data-view="coverage"
+            aria-pressed="true"
+            data-i18n="brandsTabCoverage"
+          ></button>
+          <button
+            data-view="positive"
+            aria-pressed="false"
+            data-i18n="brandsTabPositive"
+          ></button>
+          <button
+            data-view="negative"
+            aria-pressed="false"
+            data-i18n="brandsTabNegative"
+          ></button>
+        </nav>
+        <ol id="brand-list" class="brand-list"></ol>
+      </section>
+
+      <section class="topics">
         <h2 data-i18n="topicsTitle"></h2>
         <div id="topics" class="chips"></div>
       </section>
@@ -150,7 +252,9 @@
     <footer>
       <p>
         <span data-i18n="dataSource"></span>
-        <a href="https://www.businessmontres.com" rel="noopener">businessmontres.com</a>
+        <a href="https://www.businessmontres.com" rel="noopener"
+          >businessmontres.com</a
+        >
       </p>
     </footer>
 

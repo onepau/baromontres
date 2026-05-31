@@ -480,3 +480,149 @@ export async function getKeywordFrequencies(
   const { results } = await stmt.bind(...params).all<KeywordFrequency>();
   return results ?? [];
 }
+
+// ─── Subscription prices ────────────────────────────────────────────────────
+
+export async function getSubscriptionPrices(
+  db: D1Database,
+): Promise<SubscriptionPriceRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT period, price_chf, observed_at
+         FROM subscription_price
+        WHERE (period, observed_at) IN (
+          SELECT period, MAX(observed_at)
+            FROM subscription_price
+           GROUP BY period
+        )
+        ORDER BY price_chf ASC`,
+    )
+    .all<SubscriptionPriceRow>();
+  return results ?? [];
+}
+
+export async function upsertSubscriptionPrice(
+  db: D1Database,
+  period: string,
+  price_chf: number,
+): Promise<void> {
+  const latest = await db
+    .prepare(
+      `SELECT price_chf FROM subscription_price
+        WHERE period = ? ORDER BY observed_at DESC LIMIT 1`,
+    )
+    .bind(period)
+    .first<{ price_chf: number }>();
+  if (latest?.price_chf === price_chf) return;
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT INTO subscription_price (observed_at, price_chf, period) VALUES (?, ?, ?)`,
+    )
+    .bind(now, price_chf, period)
+    .run();
+}
+
+// ─── Paywall stats ───────────────────────────────────────────────────────────
+
+export interface PaywallStats {
+  since: string;
+  paywalled_count: number;
+  free_count: number;
+  priced_paywalled_count: number;
+  total_unit_price_chf: number;
+  avg_unit_price_chf: number | null;
+  subscription_tiers: Record<string, number>;
+}
+
+export async function getPaywallStats(
+  db: D1Database,
+  opts: { since?: string } = {},
+): Promise<PaywallStats> {
+  const since = opts.since ?? "1970-01-01";
+  const [agg, tiers] = await Promise.all([
+    db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN is_paywalled = 1 THEN 1 ELSE 0 END) AS paywalled_count,
+           SUM(CASE WHEN is_paywalled = 0 THEN 1 ELSE 0 END) AS free_count,
+           SUM(CASE WHEN is_paywalled = 1 AND unit_price_chf IS NOT NULL
+                    THEN 1 ELSE 0 END)                       AS priced_paywalled_count,
+           COALESCE(SUM(CASE WHEN is_paywalled = 1
+                             THEN unit_price_chf ELSE 0 END), 0) AS total_unit_price_chf,
+           AVG(CASE WHEN is_paywalled = 1 THEN unit_price_chf END) AS avg_unit_price_chf
+         FROM article
+         WHERE published_at >= ?`,
+      )
+      .bind(since)
+      .first<{
+        paywalled_count: number | null;
+        free_count: number | null;
+        priced_paywalled_count: number | null;
+        total_unit_price_chf: number | null;
+        avg_unit_price_chf: number | null;
+      }>(),
+    getSubscriptionPrices(db),
+  ]);
+
+  return {
+    since,
+    paywalled_count: agg?.paywalled_count ?? 0,
+    free_count: agg?.free_count ?? 0,
+    priced_paywalled_count: agg?.priced_paywalled_count ?? 0,
+    total_unit_price_chf: agg?.total_unit_price_chf ?? 0,
+    avg_unit_price_chf: agg?.avg_unit_price_chf ?? null,
+    subscription_tiers: Object.fromEntries(
+      tiers.map((t) => [t.period, t.price_chf]),
+    ),
+  };
+}
+
+// ─── Brand leaderboard ───────────────────────────────────────────────────────
+
+export interface BrandLeaderboardRow {
+  term: string;
+  term_en: string | null;
+  article_count: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  avg_score: number | null;
+  net_sentiment: number;
+}
+
+export async function getBrandLeaderboard(
+  db: D1Database,
+  opts: { since?: string; limit?: number; min_count?: number } = {},
+): Promise<BrandLeaderboardRow[]> {
+  const since = opts.since ?? "1970-01-01";
+  const limit = opts.limit ?? 20;
+  const minCount = opts.min_count ?? 3;
+  const { results } = await db
+    .prepare(
+      `SELECT k.term AS term,
+              MAX(k.term_en) AS term_en,
+              COUNT(DISTINCT a.id) AS article_count,
+              SUM(CASE WHEN s.label = 'positive' THEN 1 ELSE 0 END) AS positive,
+              SUM(CASE WHEN s.label = 'neutral'  THEN 1 ELSE 0 END) AS neutral,
+              SUM(CASE WHEN s.label = 'negative' THEN 1 ELSE 0 END) AS negative,
+              AVG(s.score) AS avg_score
+         FROM keyword k
+         JOIN article a   ON a.id = k.article_id
+         LEFT JOIN sentiment s ON s.article_id = a.id
+        WHERE k.kind = 'brand'
+          AND a.published_at >= ?
+        GROUP BY k.term
+        HAVING COUNT(DISTINCT a.id) >= ?
+        ORDER BY article_count DESC, term ASC
+        LIMIT ?`,
+    )
+    .bind(since, minCount, limit)
+    .all<Omit<BrandLeaderboardRow, "net_sentiment">>();
+
+  return (results ?? []).map((r) => ({
+    ...r,
+    net_sentiment:
+      r.article_count > 0 ? (r.positive - r.negative) / r.article_count : 0,
+  }));
+}
