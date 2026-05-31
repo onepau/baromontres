@@ -1,8 +1,12 @@
 import type {
   BarometerPoint,
   KeywordKind,
+  Lang,
+  SourceRow,
   SubscriptionPriceRow,
 } from "@baromontres/shared/schema";
+
+export type { Lang, SourceRow };
 
 export interface BarometerResponse {
   points: BarometerPoint[];
@@ -104,4 +108,46 @@ export async function fetchBrands(
   if (!res.ok) throw new Error(`brands ${res.status}`);
   const data = (await res.json()) as { brands: BrandLeaderboardRow[] };
   return data.brands;
+}
+
+export async function fetchSources(): Promise<SourceRow[]> {
+  const res = await fetch("/api/sources");
+  if (!res.ok) throw new Error(`sources ${res.status}`);
+  const data = (await res.json()) as { sources: SourceRow[] };
+  return data.sources;
+}
+
+export interface SourceSentiment {
+  source_id: number;
+  slug: string;
+  name: string;
+  lang: Lang;
+  weight: number;
+  article_count: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  net_sentiment: number;
+}
+
+export interface SentimentPanel {
+  since: string;
+  sources: SourceSentiment[];
+  by_language: Array<{
+    lang: Lang;
+    net_sentiment: number;
+    source_count: number;
+  }>;
+  combined: number;
+}
+
+export async function fetchSentimentPanel(
+  since?: string,
+): Promise<SentimentPanel> {
+  const url = since
+    ? `/api/sentiment/panel?since=${encodeURIComponent(since)}`
+    : "/api/sentiment/panel";
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`sentiment panel ${res.status}`);
+  return res.json();
 }

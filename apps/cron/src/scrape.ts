@@ -1,6 +1,8 @@
 import { parseHTML } from "linkedom";
 import type { ScrapedArticle } from "@baromontres/shared/queries";
 
+type ParsedArticle = Omit<ScrapedArticle, "source_id">;
+
 // Article URL prefixes we accept during discovery. Enable additional
 // entries here once the /probe endpoint confirms the site uses them.
 const ARTICLE_PATH_PATTERNS: RegExp[] = [
@@ -228,7 +230,7 @@ async function collectSitemapUrls(
 export async function fetchAndParse(
   url: string,
   userAgent: string,
-): Promise<ScrapedArticle | null> {
+): Promise<ParsedArticle | null> {
   const html = await fetchText(url, userAgent);
   return parseArticleHtml(url, html);
 }
@@ -236,7 +238,7 @@ export async function fetchAndParse(
 export function parseArticleHtml(
   url: string,
   html: string,
-): ScrapedArticle | null {
+): ParsedArticle | null {
   const { document } = parseHTML(html);
 
   const titleEl = document.querySelector("h1.entry-title");

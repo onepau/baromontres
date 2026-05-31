@@ -4,6 +4,7 @@ import {
   upsertArticle,
   existingUrls,
   getArticleByUrl,
+  getSourceBySlug,
 } from "@baromontres/shared/queries";
 import {
   discoverArticleUrls,
@@ -143,9 +144,11 @@ export default {
         return Response.json({ error: "missing ?url=" }, { status: 400 });
       const enrich = url.searchParams.get("enrich") === "1";
       const forceEnrich = url.searchParams.get("force_enrich") === "1";
-      const article = await fetchAndParse(articleUrl, env.USER_AGENT);
-      if (!article)
+      const parsed = await fetchAndParse(articleUrl, env.USER_AGENT);
+      if (!parsed)
         return Response.json({ error: "parse returned null" }, { status: 422 });
+      const bmSrc = await getSourceBySlug(env.DB, "businessmontres");
+      const article = { ...parsed, source_id: bmSrc?.id ?? 1 };
       await upsertArticle(env.DB, article);
       let enriched = false;
       if (enrich || forceEnrich) {
@@ -206,7 +209,11 @@ async function runPipeline(
   const startedAt = Date.now();
   const budgetExceeded = () => Date.now() - startedAt > BUDGET_MS;
 
-  const seen = await existingUrls(env.DB);
+  const [seen, bmSource] = await Promise.all([
+    existingUrls(env.DB),
+    getSourceBySlug(env.DB, "businessmontres"),
+  ]);
+  const defaultSourceId = bmSource?.id ?? 1;
   console.log(
     `pipeline start pages=${startPage}..${endPage} existing=${seen.size} scrapeLimit=${scrapeLimit} enrichLimit=${enrichLimit} from=${fromDate ?? "-"} to=${toDate ?? "-"} useSitemap=${opts.useSitemap ? "1" : "0"} useHomepage=${opts.useHomepage ? "1" : "0"}`,
   );
@@ -276,15 +283,16 @@ async function runPipeline(
     const batch = toScrape.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
       batch.map(async (url) => {
-        const article = await fetchAndParse(url, env.USER_AGENT);
-        if (!article) return { url, kind: "null" as const };
-        if (!inRange(article.published_at)) {
+        const parsed = await fetchAndParse(url, env.USER_AGENT);
+        if (!parsed) return { url, kind: "null" as const };
+        if (!inRange(parsed.published_at)) {
           return {
             url,
             kind: "out_of_range" as const,
-            published_at: article.published_at,
+            published_at: parsed.published_at,
           };
         }
+        const article = { ...parsed, source_id: defaultSourceId };
         await upsertArticle(env.DB, article);
         return { url, kind: "ok" as const, published_at: article.published_at };
       }),

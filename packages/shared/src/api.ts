@@ -10,9 +10,14 @@ import {
   getKeywordFrequencies,
   getPaywallStats,
   getRecentImageAssessments,
+  getSentimentPanel,
+  getSourceBySlug,
   latestSubscriptionPrice,
+  listSources,
 } from "./queries.ts";
-import type { Env, KeywordKind } from "./schema.ts";
+import type { Env, KeywordKind, Lang } from "./schema.ts";
+
+const LANGS: ReadonlySet<string> = new Set(["fr", "en"]);
 
 const KEYWORD_KINDS: ReadonlySet<KeywordKind> = new Set([
   "brand",
@@ -34,8 +39,16 @@ export function createApi(): Hono<{ Bindings: Env }> {
     const limit = limitParam
       ? Math.min(5000, Math.max(1, Number(limitParam)))
       : undefined;
+    const langParam = c.req.query("lang");
+    const lang =
+      langParam && LANGS.has(langParam) ? (langParam as Lang) : undefined;
+    const sourceSlug = c.req.query("source") ?? undefined;
+    const sourceRow = sourceSlug
+      ? await getSourceBySlug(c.env.DB, sourceSlug)
+      : null;
+    const sourceId = sourceRow?.id;
     const [points, subscription] = await Promise.all([
-      getBarometer(c.env.DB, { since, limit }),
+      getBarometer(c.env.DB, { since, limit, lang, sourceId }),
       latestSubscriptionPrice(c.env.DB),
     ]);
     return c.json({ points, subscription });
@@ -115,12 +128,33 @@ export function createApi(): Hono<{ Bindings: Env }> {
     const min_count = minCountParam
       ? Math.min(50, Math.max(1, Number(minCountParam) || 3))
       : undefined;
+    const langParam = c.req.query("lang");
+    const lang =
+      langParam && LANGS.has(langParam) ? (langParam as Lang) : undefined;
+    const sourceSlug = c.req.query("source") ?? undefined;
+    const sourceRow = sourceSlug
+      ? await getSourceBySlug(c.env.DB, sourceSlug)
+      : null;
+    const sourceId = sourceRow?.id;
     const brands = await getBrandLeaderboard(c.env.DB, {
       since,
       limit,
       min_count,
+      lang,
+      sourceId,
     });
     return c.json({ brands });
+  });
+
+  app.get("/api/sources", async (c) => {
+    const sources = await listSources(c.env.DB, { activeOnly: true });
+    return c.json({ sources });
+  });
+
+  app.get("/api/sentiment/panel", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const panel = await getSentimentPanel(c.env.DB, { since });
+    return c.json(panel);
   });
 
   return app;

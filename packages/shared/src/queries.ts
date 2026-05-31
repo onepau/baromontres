@@ -5,8 +5,10 @@ import type {
   ImageAnalysisRow,
   KeywordKind,
   KeywordRow,
+  Lang,
   SentimentLabel,
   SentimentRow,
+  SourceRow,
   SubscriptionPriceRow,
 } from "./schema.ts";
 
@@ -14,6 +16,7 @@ export interface ScrapedArticle {
   url: string;
   title: string;
   published_at: string;
+  source_id: number;
   is_paywalled: boolean;
   unit_price_chf: number | null;
   preview_text: string | null;
@@ -28,12 +31,14 @@ export async function upsertArticle(
   const now = new Date().toISOString();
   const result = await db
     .prepare(
-      `INSERT INTO article (url, title, published_at, is_paywalled, unit_price_chf,
-                            preview_text, full_text, hero_image_url, scraped_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO article (url, title, published_at, source_id, is_paywalled,
+                            unit_price_chf, preview_text, full_text,
+                            hero_image_url, scraped_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(url) DO UPDATE SET
          title          = excluded.title,
          published_at   = excluded.published_at,
+         source_id      = excluded.source_id,
          is_paywalled   = excluded.is_paywalled,
          unit_price_chf = excluded.unit_price_chf,
          preview_text   = excluded.preview_text,
@@ -46,6 +51,7 @@ export async function upsertArticle(
       a.url,
       a.title,
       a.published_at,
+      a.source_id,
       a.is_paywalled ? 1 : 0,
       a.unit_price_chf,
       a.preview_text,
@@ -171,29 +177,46 @@ export async function persistEnrichment(
 
 export async function getBarometer(
   db: D1Database,
-  opts: { since?: string; limit?: number } = {},
+  opts: { since?: string; limit?: number; lang?: Lang; sourceId?: number } = {},
 ): Promise<BarometerPoint[]> {
   const since = opts.since ?? "1970-01-01";
   const limit = opts.limit ?? 1000;
+  const filters: string[] = [
+    "a.unit_price_chf IS NOT NULL",
+    "a.published_at >= ?",
+  ];
+  const params: unknown[] = [since];
+  if (opts.lang) {
+    filters.push("src.lang = ?");
+    params.push(opts.lang);
+  }
+  if (opts.sourceId) {
+    filters.push("a.source_id = ?");
+    params.push(opts.sourceId);
+  }
+  params.push(limit);
   const { results } = await db
     .prepare(
-      `SELECT a.id            AS article_id,
-              a.url           AS url,
-              a.title         AS title,
-              a.published_at  AS published_at,
+      `SELECT a.id             AS article_id,
+              a.url            AS url,
+              a.title          AS title,
+              a.published_at   AS published_at,
               a.unit_price_chf AS unit_price_chf,
-              a.is_paywalled  AS is_paywalled,
+              a.is_paywalled   AS is_paywalled,
               a.hero_image_url AS hero_image_url,
-              s.label         AS sentiment_label,
-              s.score         AS sentiment_score
+              a.source_id      AS source_id,
+              src.slug         AS source_slug,
+              src.lang         AS source_lang,
+              s.label          AS sentiment_label,
+              s.score          AS sentiment_score
          FROM article a
          LEFT JOIN sentiment s ON s.article_id = a.id
-        WHERE a.unit_price_chf IS NOT NULL
-          AND a.published_at >= ?
+         LEFT JOIN source    src ON src.id = a.source_id
+        WHERE ${filters.join(" AND ")}
         ORDER BY a.published_at ASC
         LIMIT ?`,
     )
-    .bind(since, limit)
+    .bind(...params)
     .all<BarometerPoint>();
   return results ?? [];
 }
@@ -217,7 +240,7 @@ export async function getArticleDetail(
     .bind(id)
     .first<ArticleRow>();
   if (!article) return null;
-  const [{ results: keywords }, sentiment, { results: images }] =
+  const [{ results: keywords }, sentiment, { results: images }, source] =
     await Promise.all([
       db
         .prepare(
@@ -233,12 +256,19 @@ export async function getArticleDetail(
         .prepare(`SELECT * FROM image_analysis WHERE article_id = ?`)
         .bind(id)
         .all<ImageAnalysisRow>(),
+      article.source_id
+        ? db
+            .prepare(`SELECT * FROM source WHERE id = ?`)
+            .bind(article.source_id)
+            .first<SourceRow>()
+        : Promise.resolve(null),
     ]);
   return {
     ...article,
     keywords: keywords ?? [],
     sentiment: sentiment ?? null,
     images: images ?? [],
+    source: source ?? null,
   };
 }
 
@@ -481,6 +511,29 @@ export async function getKeywordFrequencies(
   return results ?? [];
 }
 
+// ─── Source helpers ──────────────────────────────────────────────────────────
+
+export async function listSources(
+  db: D1Database,
+  opts: { activeOnly?: boolean } = {},
+): Promise<SourceRow[]> {
+  const sql = opts.activeOnly
+    ? `SELECT * FROM source WHERE active = 1 ORDER BY lang, name`
+    : `SELECT * FROM source ORDER BY lang, name`;
+  const { results } = await db.prepare(sql).all<SourceRow>();
+  return results ?? [];
+}
+
+export async function getSourceBySlug(
+  db: D1Database,
+  slug: string,
+): Promise<SourceRow | null> {
+  return db
+    .prepare(`SELECT * FROM source WHERE slug = ?`)
+    .bind(slug)
+    .first<SourceRow>();
+}
+
 // ─── Subscription prices ────────────────────────────────────────────────────
 
 export async function getSubscriptionPrices(
@@ -593,11 +646,32 @@ export interface BrandLeaderboardRow {
 
 export async function getBrandLeaderboard(
   db: D1Database,
-  opts: { since?: string; limit?: number; min_count?: number } = {},
+  opts: {
+    since?: string;
+    limit?: number;
+    min_count?: number;
+    lang?: Lang;
+    sourceId?: number;
+  } = {},
 ): Promise<BrandLeaderboardRow[]> {
   const since = opts.since ?? "1970-01-01";
   const limit = opts.limit ?? 20;
   const minCount = opts.min_count ?? 3;
+  const filters: string[] = ["k.kind = 'brand'", "a.published_at >= ?"];
+  const params: unknown[] = [since];
+  if (opts.lang) {
+    filters.push("src.lang = ?");
+    params.push(opts.lang);
+  }
+  if (opts.sourceId) {
+    filters.push("a.source_id = ?");
+    params.push(opts.sourceId);
+  }
+  params.push(minCount, limit);
+  const joinSource =
+    opts.lang || opts.sourceId
+      ? `LEFT JOIN source src ON src.id = a.source_id`
+      : "";
   const { results } = await db
     .prepare(
       `SELECT k.term AS term,
@@ -610,14 +684,14 @@ export async function getBrandLeaderboard(
          FROM keyword k
          JOIN article a   ON a.id = k.article_id
          LEFT JOIN sentiment s ON s.article_id = a.id
-        WHERE k.kind = 'brand'
-          AND a.published_at >= ?
+         ${joinSource}
+        WHERE ${filters.join(" AND ")}
         GROUP BY k.term
         HAVING COUNT(DISTINCT a.id) >= ?
         ORDER BY article_count DESC, term ASC
         LIMIT ?`,
     )
-    .bind(since, minCount, limit)
+    .bind(...params)
     .all<Omit<BrandLeaderboardRow, "net_sentiment">>();
 
   return (results ?? []).map((r) => ({
@@ -625,4 +699,89 @@ export async function getBrandLeaderboard(
     net_sentiment:
       r.article_count > 0 ? (r.positive - r.negative) / r.article_count : 0,
   }));
+}
+
+// ─── Sentiment panel ─────────────────────────────────────────────────────────
+
+export interface SourceSentiment {
+  source_id: number;
+  slug: string;
+  name: string;
+  lang: Lang;
+  weight: number;
+  article_count: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  net_sentiment: number;
+}
+
+export async function getSentimentBySource(
+  db: D1Database,
+  opts: { since?: string } = {},
+): Promise<SourceSentiment[]> {
+  const since = opts.since ?? "1970-01-01";
+  const { results } = await db
+    .prepare(
+      `SELECT src.id    AS source_id,
+              src.slug  AS slug,
+              src.name  AS name,
+              src.lang  AS lang,
+              src.weight AS weight,
+              COUNT(a.id) AS article_count,
+              SUM(CASE WHEN s.label = 'positive' THEN 1 ELSE 0 END) AS positive,
+              SUM(CASE WHEN s.label = 'neutral'  THEN 1 ELSE 0 END) AS neutral,
+              SUM(CASE WHEN s.label = 'negative' THEN 1 ELSE 0 END) AS negative
+         FROM source src
+         JOIN article a   ON a.source_id = src.id AND a.published_at >= ?
+         LEFT JOIN sentiment s ON s.article_id = a.id
+        WHERE src.active = 1
+        GROUP BY src.id
+        HAVING COUNT(a.id) > 0
+        ORDER BY src.lang, src.name`,
+    )
+    .bind(since)
+    .all<Omit<SourceSentiment, "net_sentiment">>();
+  return (results ?? []).map((r) => ({
+    ...r,
+    net_sentiment:
+      r.article_count > 0 ? (r.positive - r.negative) / r.article_count : 0,
+  }));
+}
+
+export interface SentimentPanel {
+  since: string;
+  sources: SourceSentiment[];
+  by_language: Array<{
+    lang: Lang;
+    net_sentiment: number;
+    source_count: number;
+  }>;
+  combined: number;
+}
+
+export async function getSentimentPanel(
+  db: D1Database,
+  opts: { since?: string } = {},
+): Promise<SentimentPanel> {
+  const since = opts.since ?? "1970-01-01";
+  const sources = await getSentimentBySource(db, { since });
+  const langs: Lang[] = ["fr", "en"];
+  const by_language = langs
+    .map((lang) => {
+      const rows = sources.filter((s) => s.lang === lang);
+      const net =
+        rows.length > 0
+          ? rows.reduce((acc, r) => acc + r.net_sentiment * r.weight, 0) /
+            rows.reduce((acc, r) => acc + r.weight, 0)
+          : 0;
+      return { lang, net_sentiment: net, source_count: rows.length };
+    })
+    .filter((l) => l.source_count > 0);
+  const combined =
+    by_language.length > 0
+      ? by_language.reduce((acc, l) => acc + l.net_sentiment, 0) /
+        by_language.length
+      : 0;
+  return { since, sources, by_language, combined };
 }
