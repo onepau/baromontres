@@ -6,8 +6,10 @@ import {
   fetchFlaggedImages,
   fetchKeywords,
   fetchPaywall,
+  fetchSentimentPanel,
   type BrandLeaderboardRow,
   type FlaggedImage,
+  type SentimentPanel,
 } from "./api.ts";
 import { renderBarometer } from "./chart.ts";
 import type { BarometerPoint } from "@baromontres/shared/schema";
@@ -18,6 +20,7 @@ let allPoints: BarometerPoint[] = [];
 let currentSubscription: number | null = null;
 let currentPaywallPeriod = "monthly";
 let brandRows: BrandLeaderboardRow[] = [];
+let sentimentPanel: SentimentPanel | null = null;
 
 const PAYWALL_PERIOD_DAYS: Record<string, number> = {
   weekly: 7,
@@ -35,6 +38,7 @@ async function boot(): Promise<void> {
     void renderImageFlags();
     void renderPaywallMeter(currentPaywallPeriod);
     void renderBrandLeaderboard();
+    void renderSentimentPanel();
   });
   bindResetZoom();
   bindRangeFilter();
@@ -46,6 +50,7 @@ async function boot(): Promise<void> {
     renderImageFlags(),
     renderPaywallMeter(),
     renderBrandLeaderboard(),
+    renderSentimentPanel(),
   ]);
 }
 
@@ -411,6 +416,60 @@ function formatShortDate(iso: string, lang: "fr" | "en"): string {
     month: "short",
     year: "numeric",
   });
+}
+
+async function renderSentimentPanel(): Promise<void> {
+  const list = document.getElementById("source-list");
+  if (!list) return;
+  try {
+    if (!sentimentPanel) {
+      sentimentPanel = await fetchSentimentPanel();
+    }
+    const panel = sentimentPanel;
+    const en = getLang() === "en";
+    list.replaceChildren(
+      ...panel.sources.map((src) => {
+        const li = document.createElement("li");
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "source-name";
+        nameSpan.textContent = src.name;
+
+        const langBadge = document.createElement("span");
+        langBadge.className = "source-lang";
+        langBadge.textContent = src.lang.toUpperCase();
+        nameSpan.append(langBadge);
+
+        const barWrap = document.createElement("span");
+        barWrap.className = "source-bar-wrap";
+        const bar = document.createElement("span");
+        bar.className = "source-bar";
+        const pct = Math.round(Math.abs(src.net_sentiment) * 100);
+        bar.style.width = `${pct}%`;
+        bar.dataset.positive = src.net_sentiment > 0 ? "true" : "false";
+        bar.dataset.negative = src.net_sentiment < 0 ? "true" : "false";
+        bar.dataset.neutral = src.net_sentiment === 0 ? "true" : "false";
+        barWrap.append(bar);
+
+        const countSpan = document.createElement("span");
+        countSpan.className = "source-count";
+        countSpan.textContent = String(src.article_count);
+
+        const netSpan = document.createElement("span");
+        netSpan.className = "source-net";
+        const netPct = Math.round(src.net_sentiment * 100);
+        netSpan.textContent = netPct > 0 ? `+${netPct}%` : `${netPct}%`;
+        netSpan.dataset.positive = netPct > 0 ? "true" : "false";
+        netSpan.dataset.negative = netPct < 0 ? "true" : "false";
+
+        li.append(nameSpan, barWrap, countSpan, netSpan);
+        void en; // lang used indirectly via nameSpan above
+        return li;
+      }),
+    );
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 void boot();

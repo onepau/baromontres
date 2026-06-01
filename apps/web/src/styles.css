@@ -836,6 +836,117 @@ footer {
   font-size: 13px;
 }
 
+/* ---------- Sentiment panel ---------- */
+
+.sentiment-panel {
+  margin-top: 40px;
+}
+
+.sentiment-panel h2 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+
+.source-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-list li {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: border-color 160ms ease;
+}
+
+.source-list li:hover {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.source-name {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-lang {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--line);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.source-count {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.source-net {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+  text-align: right;
+}
+
+.source-net[data-positive="true"] {
+  color: var(--positive);
+}
+
+.source-net[data-negative="true"] {
+  color: var(--negative);
+}
+
+.source-bar-wrap {
+  width: 60px;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.source-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 400ms ease;
+}
+
+.source-bar[data-positive="true"] {
+  background: var(--positive);
+}
+
+.source-bar[data-negative="true"] {
+  background: var(--negative);
+}
+
+.source-bar[data-neutral="true"] {
+  background: var(--neutral);
+}
+
+/* ---------- Footer ---------- */
+
 footer a {
   color: var(--accent);
   text-decoration: none;

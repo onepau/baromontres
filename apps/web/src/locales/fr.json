@@ -38,5 +38,7 @@
   "resetZoom": "Réinitialiser le zoom",
   "rangeAll": "Tout",
   "introTitle": "Le pouls de la presse horlogère francophone",
-  "introBody": "Baromontres suit au jour le jour les articles de businessmontres.com pour mesurer le prix unitaire des contenus payants, la tonalité éditoriale et les marques mentionnées. Les passionnés d'horlogerie y trouvent une vue d'ensemble des sujets qui rythment la presse spécialisée — du prix d'un dossier à la fréquence des marques évoquées, en passant par les images détournées ou générées par IA repérées par notre classificateur."
+  "introBody": "Baromontres suit au jour le jour les articles de businessmontres.com pour mesurer le prix unitaire des contenus payants, la tonalité éditoriale et les marques mentionnées. Les passionnés d'horlogerie y trouvent une vue d'ensemble des sujets qui rythment la presse spécialisée — du prix d'un dossier à la fréquence des marques évoquées, en passant par les images détournées ou générées par IA repérées par notre classificateur.",
+  "sentimentPanelTitle": "Baromètre multi-sources",
+  "sentimentPanelCaption": "Tonalité éditoriale par source, calculée sur l'ensemble des articles analysés."
 }

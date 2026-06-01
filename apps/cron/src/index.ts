@@ -5,6 +5,7 @@ import {
   existingUrls,
   getArticleByUrl,
   getSourceBySlug,
+  listSources,
 } from "@baromontres/shared/queries";
 import {
   discoverArticleUrls,
@@ -14,6 +15,7 @@ import {
   probeArchivePage,
 } from "./scrape.ts";
 import { enrichArticle } from "./enrich.ts";
+import { runSourceDiscovery } from "./adapters.ts";
 
 // How to backfill (operator recipe):
 //   <WEB>  = the site host (also serves /api/*), e.g. baromontres.<acc>.workers.dev
@@ -359,6 +361,22 @@ async function runPipeline(
   } else {
     console.log(`enrich phase: skipped (no time budget remaining)`);
   }
+  // ── Multi-source discovery (all active sources except Business Montres) ───
+  if (!budgetExceeded()) {
+    const allSources = await listSources(env.DB, { activeOnly: true });
+    const otherSources = allSources.filter((s) => s.slug !== "businessmontres");
+    for (const src of otherSources) {
+      if (budgetExceeded()) break;
+      try {
+        const r = await runSourceDiscovery(src, seen, env.DB, env.USER_AGENT);
+        scraped += r.upserted;
+        errors.push(...r.errors);
+      } catch (err) {
+        errors.push(`source ${src.slug}: ${stringifyError(err)}`);
+      }
+    }
+  }
+
   console.log(
     `pipeline done: discovered=${candidates.length} scraped=${scraped} out_of_range=${skippedOutOfRange} enriched=${enriched} errors=${errors.length}`,
   );
