@@ -128,6 +128,7 @@ export function renderBarometer(
         },
         y: {
           min: 0,
+          max: 15,
           title: { display: true, text: "CHF" },
         },
       },
@@ -152,6 +153,7 @@ export function renderBarometer(
           },
           limits: {
             x: { minRange: SEVEN_DAYS_MS },
+            y: { min: 0, max: 15 },
           },
         },
       },
