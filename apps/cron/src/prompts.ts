@@ -22,7 +22,7 @@ Renvoie STRICTEMENT un objet JSON conforme au schéma suivant, sans commentaire 
 
 Règles :
 - 3 à 12 keywords. Pas de doublons. Pas de mots vides.
-- "brand" = marque horlogère (Rolex, Patek Philippe, …).
+- "brand" = marque horlogère reconnue (Rolex, Patek Philippe, Omega, …). Ne jamais inclure des noms de médias, de colonnes éditoriales, de rubriques ou de publications (Atlantico, Culturemontres, Business Montres Vision, Le Figaro, Europa Star, etc.).
 - "model" = référence ou nom de modèle (Daytona, Nautilus, Royal Oak, …).
 - "person" = personne nommée (CEO, designer, collectionneur).
 - "topic" = sujet général (enchères, salon, contrefaçon, prix, marketing…).

@@ -673,7 +673,7 @@ export async function getBrandLeaderboard(
       : "";
   const { results } = await db
     .prepare(
-      `SELECT k.term AS term,
+      `SELECT MIN(k.term) AS term,
               MAX(k.term_en) AS term_en,
               COUNT(DISTINCT a.id) AS article_count,
               SUM(CASE WHEN s.label = 'positive' THEN 1 ELSE 0 END) AS positive,
@@ -685,7 +685,13 @@ export async function getBrandLeaderboard(
          LEFT JOIN sentiment s ON s.article_id = a.id
          ${joinSource}
         WHERE ${filters.join(" AND ")}
-        GROUP BY k.term
+          AND LOWER(k.term) NOT IN (
+                'atlantico','culturemontres','culture montres',
+                'business montres','business montres vision','businessmontres',
+                'le figaro','world tempus','montre24','watchonista',
+                'europa star','calibre 11','watch time'
+              )
+        GROUP BY LOWER(k.term)
         HAVING COUNT(DISTINCT a.id) >= ?
         ORDER BY article_count DESC, term ASC
         LIMIT ?`,
