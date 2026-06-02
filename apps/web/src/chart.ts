@@ -9,10 +9,13 @@ import {
   Filler,
   type ChartConfiguration,
   type TooltipModel,
-} from 'chart.js';
-import zoomPlugin from 'chartjs-plugin-zoom';
-import type { BarometerPoint, SubscriptionPriceRow } from '@baromontres/shared/schema';
-import { getLang, t } from './i18n.ts';
+} from "chart.js";
+import zoomPlugin from "chartjs-plugin-zoom";
+import type {
+  BarometerPoint,
+  SubscriptionPriceRow,
+} from "@baromontres/shared/schema";
+import { getLang, t } from "./i18n.ts";
 
 Chart.register(
   LineController,
@@ -28,14 +31,14 @@ Chart.register(
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 const SENTIMENT_COLOR = {
-  positive: '#2f9e44',
-  neutral: '#f0b400',
-  negative: '#e03131',
+  positive: "#2f9e44",
+  neutral: "#f0b400",
+  negative: "#e03131",
 } as const;
-const UNKNOWN_COLOR = '#b0a89c';
+const UNKNOWN_COLOR = "#b0a89c";
 
 function sentimentColor(label: string | null | undefined): string {
-  if (label === 'positive' || label === 'neutral' || label === 'negative') {
+  if (label === "positive" || label === "neutral" || label === "negative") {
     return SENTIMENT_COLOR[label];
   }
   return UNKNOWN_COLOR;
@@ -61,9 +64,9 @@ export function renderBarometer(
 
   const colors = points.map((p) => sentimentColor(p.sentiment_label));
 
-  const datasets: ChartConfiguration<'line'>['data']['datasets'] = [
+  const datasets: ChartConfiguration<"line">["data"]["datasets"] = [
     {
-      label: 'price',
+      label: "price",
       data: data as unknown as { x: number; y: number }[],
       parsing: false,
       showLine: false,
@@ -80,13 +83,12 @@ export function renderBarometer(
   const monthlyMeans = monthlyAverage(points);
   if (monthlyMeans.length >= 2) {
     datasets.push({
-      label: 'monthly_average',
+      label: "monthly_average",
       data: monthlyMeans as unknown as { x: number; y: number }[],
       parsing: false,
       showLine: true,
-      borderDash: [3, 4],
-      borderColor: 'rgba(251, 191, 36, 0.7)',
-      borderWidth: 1.5,
+      borderColor: "#f59e0b",
+      borderWidth: 2.5,
       pointRadius: 0,
       pointHoverRadius: 0,
       tension: 0.35,
@@ -96,14 +98,14 @@ export function renderBarometer(
 
   if (subscription) {
     datasets.push({
-      label: 'subscription',
+      label: "subscription",
       data: [
         { x: data[0]!.x, y: subscription.price_chf },
         { x: data[data.length - 1]!.x, y: subscription.price_chf },
       ] as unknown as { x: number; y: number }[],
       parsing: false,
       showLine: true,
-      borderColor: 'rgba(160,160,160,0.5)',
+      borderColor: "rgba(160,160,160,0.5)",
       borderDash: [4, 4],
       pointRadius: 0,
       borderWidth: 1.5,
@@ -111,8 +113,8 @@ export function renderBarometer(
     });
   }
 
-  const config: ChartConfiguration<'line'> = {
-    type: 'line',
+  const config: ChartConfiguration<"line"> = {
+    type: "line",
     data: { datasets },
     options: {
       responsive: true,
@@ -120,13 +122,13 @@ export function renderBarometer(
       animation: { duration: 200 },
       scales: {
         x: {
-          type: 'time',
-          time: { unit: 'month' },
+          type: "time",
+          time: { unit: "month" },
           grid: { display: false },
         },
         y: {
-          beginAtZero: false,
-          title: { display: true, text: 'CHF' },
+          min: 0,
+          title: { display: true, text: "CHF" },
         },
       },
       plugins: {
@@ -138,13 +140,13 @@ export function renderBarometer(
           zoom: {
             wheel: { enabled: true },
             pinch: { enabled: true },
-            mode: 'xy',
+            mode: "xy",
             onZoom: ({ chart }) => notifyView(chart, onViewChange),
             onZoomComplete: ({ chart }) => notifyView(chart, onViewChange),
           },
           pan: {
             enabled: true,
-            mode: 'xy',
+            mode: "xy",
             onPan: ({ chart }) => notifyView(chart, onViewChange),
             onPanComplete: ({ chart }) => notifyView(chart, onViewChange),
           },
@@ -168,7 +170,7 @@ function notifyView(
   if (!scale) return;
   const min = scale.min;
   const max = scale.max;
-  if (typeof min !== 'number' || typeof max !== 'number') {
+  if (typeof min !== "number" || typeof max !== "number") {
     cb(null);
     return;
   }
@@ -176,7 +178,7 @@ function notifyView(
 }
 
 function renderHtmlTooltip(
-  ctx: { tooltip: TooltipModel<'line'>; chart: Chart },
+  ctx: { tooltip: TooltipModel<"line">; chart: Chart },
   el: HTMLElement,
   canvas: HTMLCanvasElement,
 ): void {
@@ -195,20 +197,23 @@ function renderHtmlTooltip(
   const lang = getLang();
   const sentimentDot = p.sentiment_label
     ? `dot-${p.sentiment_label}`
-    : 'dot-unknown';
-  const sentimentLabel = p.sentiment_label ? t(p.sentiment_label) : t('unknown');
-  const paywall = p.is_paywalled ? t('paywall') : t('free');
+    : "dot-unknown";
+  const sentimentLabel = p.sentiment_label
+    ? t(p.sentiment_label)
+    : t("unknown");
+  const paywall = p.is_paywalled ? t("paywall") : t("free");
   const dateStr = formatDate(p.published_at, lang);
 
   el.innerHTML = `
     <a href="${escapeAttr(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.title)}</a>
-    <div class="tt-meta">${t('tooltipDate')} ${escapeHtml(dateStr)} · ${escapeHtml(paywall)}</div>
-    <div class="tt-meta">${t('tooltipPrice')}: <strong>${p.unit_price_chf.toFixed(2)} CHF</strong></div>
+    <div class="tt-meta">${t("tooltipDate")} ${escapeHtml(dateStr)} · ${escapeHtml(paywall)}</div>
+    <div class="tt-meta">${t("tooltipPrice")}: <strong>${p.unit_price_chf.toFixed(2)} CHF</strong></div>
     <div class="tt-sentiment"><span class="dot ${sentimentDot}"></span>${escapeHtml(sentimentLabel)}</div>
   `;
 
   const rect = canvas.getBoundingClientRect();
-  const wrapRect = (el.offsetParent as HTMLElement | null)?.getBoundingClientRect() ?? rect;
+  const wrapRect =
+    (el.offsetParent as HTMLElement | null)?.getBoundingClientRect() ?? rect;
   const left = rect.left - wrapRect.left + tt.caretX + 12;
   const top = rect.top - wrapRect.top + tt.caretY - 12;
   el.style.left = `${left}px`;
@@ -226,9 +231,11 @@ function monthlyAverage(points: BarometerPoint[]): { x: number; y: number }[] {
     buckets.set(key, b);
   }
   const out: { x: number; y: number }[] = [];
-  for (const [key, b] of [...buckets.entries()].sort(([a], [c]) => a.localeCompare(c))) {
+  for (const [key, b] of [...buckets.entries()].sort(([a], [c]) =>
+    a.localeCompare(c),
+  )) {
     if (b.count === 0) continue;
-    const [yStr, mStr] = key.split('-');
+    const [yStr, mStr] = key.split("-");
     const y = Number(yStr);
     const m = Number(mStr);
     // Mid-month timestamp (UTC), avoids edge-of-month visual bias.
@@ -238,32 +245,32 @@ function monthlyAverage(points: BarometerPoint[]): { x: number; y: number }[] {
   return out;
 }
 
-function formatDate(iso: string, lang: 'fr' | 'en'): string {
+function formatDate(iso: string, lang: "fr" | "en"): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
 function noDataNode(): HTMLElement {
-  const div = document.createElement('div');
-  div.className = 'hint';
-  div.dataset.i18n = 'noData';
-  div.textContent = t('noData');
+  const div = document.createElement("div");
+  div.className = "hint";
+  div.dataset.i18n = "noData";
+  div.textContent = t("noData");
   return div;
 }
 
 function escapeHtml(s: string): string {
   return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/'/g, '&#39;');
+  return escapeHtml(s).replace(/'/g, "&#39;");
 }

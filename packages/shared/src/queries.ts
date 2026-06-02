@@ -180,7 +180,6 @@ export async function getBarometer(
   opts: { since?: string; limit?: number; lang?: Lang; sourceId?: number } = {},
 ): Promise<BarometerPoint[]> {
   const since = opts.since ?? "1970-01-01";
-  const limit = opts.limit ?? 1000;
   const filters: string[] = [
     "a.unit_price_chf IS NOT NULL",
     "a.published_at >= ?",
@@ -194,7 +193,8 @@ export async function getBarometer(
     filters.push("a.source_id = ?");
     params.push(opts.sourceId);
   }
-  params.push(limit);
+  const limitClause = opts.limit !== undefined ? " LIMIT ?" : "";
+  if (opts.limit !== undefined) params.push(opts.limit);
   const { results } = await db
     .prepare(
       `SELECT a.id             AS article_id,
@@ -213,8 +213,7 @@ export async function getBarometer(
          LEFT JOIN sentiment s ON s.article_id = a.id
          LEFT JOIN source    src ON src.id = a.source_id
         WHERE ${filters.join(" AND ")}
-        ORDER BY a.published_at ASC
-        LIMIT ?`,
+        ORDER BY a.published_at ASC${limitClause}`,
     )
     .bind(...params)
     .all<BarometerPoint>();
