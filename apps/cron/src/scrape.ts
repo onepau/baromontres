@@ -262,7 +262,7 @@ export function parseArticleHtml(
   const contentEl =
     document.querySelector("div.entry-content") ??
     document.querySelector("article") ??
-    document.body;
+    null; // Never fall back to body — sidebars and widgets contaminate keyword extraction
 
   const preview_text = is_paywalled
     ? extractPreview(contentEl, 1200)

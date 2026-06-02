@@ -689,7 +689,8 @@ export async function getBrandLeaderboard(
                 'atlantico','culturemontres','culture montres',
                 'business montres','business montres vision','businessmontres',
                 'le figaro','world tempus','montre24','watchonista',
-                'europa star','calibre 11','watch time'
+                'europa star','calibre 11','watch time',
+                'code41'
               )
         GROUP BY LOWER(k.term)
         HAVING COUNT(DISTINCT a.id) >= ?
