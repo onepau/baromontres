@@ -87,7 +87,6 @@ const CARTOON_ENTITY_MAP: Record<string, PopCultureSource> = {
   obelix: "asterix",
   uderzo: "asterix",
   "gaston lagaffe": "gaston",
-  gaston: "gaston",
   lagaffe: "gaston",
   franquin: "gaston",
   "calvin and hobbes": "calvin_hobbes",
@@ -133,7 +132,6 @@ function detectCartoon(vision: VisionResult): PopCultureSource | null {
   const candidates = [
     ...vision.webEntities.map((e) => e.toLowerCase()),
     vision.bestGuessLabel?.toLowerCase() ?? "",
-    ...vision.sourcePageUrls.map((u) => u.toLowerCase()),
   ];
   for (const text of candidates) {
     for (const [key, source] of Object.entries(CARTOON_ENTITY_MAP)) {

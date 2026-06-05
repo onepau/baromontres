@@ -316,7 +316,6 @@ export async function getFlaggedImages(
            OR (i.ai_generated_likelihood IS NOT NULL AND i.ai_generated_likelihood >= 0.5)
            OR i.not_watch_image = 1
            OR i.has_text_overlay = 1
-           OR i.source_clue IS NOT NULL
         ORDER BY a.published_at DESC
         LIMIT ?`,
     )

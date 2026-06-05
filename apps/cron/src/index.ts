@@ -42,8 +42,14 @@ import { runSourceDiscovery } from "./adapters.ts";
 //   curl -X POST 'https://<CRON>/run?use_homepage=1&start_page=21&pages=20&enrich_limit=0&scrape_max=50'
 //   # ... continue until no new articles are found
 //
-//   # 5. Drain enrichment afterwards:
+//   # 5. Drain enrichment afterwards (single bounded run):
 //   curl -X POST 'https://<CRON>/run?enrich_limit=20'
+//
+//   # 6. Drain ALL outstanding enrichment without hitting Cloudflare time limits.
+//   #    Fire once — the worker self-chains across fresh invocations until done.
+//   #    Each invocation enriches one batch, then re-invokes itself; stops when
+//   #    listUnenriched() returns 0 or a full batch produces no progress.
+//   curl -X POST 'https://<CRON>/enrich?batch=5'
 
 interface CronEnv extends Env {
   SCRAPE_LIMIT: string;
@@ -139,6 +145,13 @@ export default {
       }
       const result = await runPipeline(env);
       return Response.json(result);
+    }
+    if (url.pathname === "/enrich" && req.method === "POST") {
+      const batchParam = url.searchParams.get("batch");
+      const batch = batchParam ? clampInt(batchParam, 1, 50) : 5;
+      const selfUrl = `${url.origin}/enrich?batch=${batch}`;
+      ctx.waitUntil(drainEnrichment(env, batch, selfUrl));
+      return Response.json({ started: true, batch });
     }
     if (url.pathname === "/scrape" && req.method === "POST") {
       const articleUrl = url.searchParams.get("url");
@@ -388,6 +401,38 @@ async function runPipeline(
     enriched,
     errors,
   };
+}
+
+async function drainEnrichment(
+  env: CronEnv,
+  batchSize: number,
+  selfUrl: string,
+): Promise<void> {
+  const BUDGET_MS = 25_000;
+  const startedAt = Date.now();
+  const pending = await listUnenriched(env.DB, batchSize);
+  if (pending.length === 0) {
+    console.log("enrich drain: complete — no pending articles");
+    return;
+  }
+  let enriched = 0;
+  for (const row of pending) {
+    if (Date.now() - startedAt > BUDGET_MS) break;
+    try {
+      await enrichArticle(env, row);
+      enriched += 1;
+    } catch (err) {
+      console.error(`enrich failed: ${row.url} :: ${stringifyError(err)}`);
+    }
+  }
+  console.log(
+    `enrich batch: size=${batchSize} pending=${pending.length} enriched=${enriched}`,
+  );
+  // Continue only if we made progress — prevents an infinite loop when a
+  // batch of articles consistently fails enrichment.
+  if (enriched > 0) {
+    await fetch(selfUrl, { method: "POST" });
+  }
 }
 
 function stringifyError(err: unknown): string {
