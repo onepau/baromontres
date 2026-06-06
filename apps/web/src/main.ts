@@ -243,12 +243,13 @@ async function renderBrandLeaderboard(view = "coverage"): Promise<void> {
       return;
     }
   }
-  const rows = [...brandRows];
+  let rows = [...brandRows];
   if (view === "positive")
     rows.sort((a, b) => b.net_sentiment - a.net_sentiment);
-  else if (view === "negative")
+  else if (view === "negative") {
+    rows = rows.filter((r) => r.net_sentiment < 0);
     rows.sort((a, b) => a.net_sentiment - b.net_sentiment);
-  else rows.sort((a, b) => b.article_count - a.article_count);
+  } else rows.sort((a, b) => b.article_count - a.article_count);
 
   const list = document.getElementById("brand-list");
   if (!list) return;
