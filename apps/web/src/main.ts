@@ -38,7 +38,7 @@ async function boot(): Promise<void> {
     void renderImageFlags();
     void renderPaywallMeter(currentPaywallPeriod);
     void renderBrandLeaderboard();
-    void renderSentimentPanel();
+    // void renderSentimentPanel(); // on hold
   });
   bindResetZoom();
   bindRangeFilter();
@@ -50,7 +50,7 @@ async function boot(): Promise<void> {
     renderImageFlags(),
     renderPaywallMeter(),
     renderBrandLeaderboard(),
-    renderSentimentPanel(),
+    // renderSentimentPanel(), // on hold
   ]);
 }
 

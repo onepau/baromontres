@@ -181,6 +181,21 @@ export default {
       }
       return Response.json({ scraped: article, enriched });
     }
+    if (url.pathname === "/query" && req.method === "GET") {
+      const term = url.searchParams.get("term");
+      if (!term)
+        return Response.json({ error: "missing ?term=" }, { status: 400 });
+      const like = `%${term.toLowerCase()}%`;
+      const row = await env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM article
+          WHERE LOWER(title)        LIKE ?
+             OR LOWER(preview_text) LIKE ?
+             OR LOWER(full_text)    LIKE ?`,
+      )
+        .bind(like, like, like)
+        .first<{ n: number }>();
+      return Response.json({ term, count: row?.n ?? 0 });
+    }
     return new Response("baromontres cron worker", { status: 200 });
   },
 };
