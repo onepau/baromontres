@@ -17,8 +17,15 @@ export default defineConfig({
         en: resolve(here, 'src/en/index.html'),
       },
       output: {
-        manualChunks: {
-          chart: ['chart.js', 'chartjs-adapter-date-fns', 'chartjs-plugin-zoom', 'date-fns'],
+        manualChunks(id) {
+          if (
+            id.includes('/chart.js/') ||
+            id.includes('/chartjs-adapter-date-fns/') ||
+            id.includes('/chartjs-plugin-zoom/') ||
+            id.includes('/date-fns/')
+          ) {
+            return 'chart';
+          }
         },
       },
     },
