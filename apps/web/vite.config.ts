@@ -16,6 +16,11 @@ export default defineConfig({
         main: resolve(here, 'src/index.html'),
         en: resolve(here, 'src/en/index.html'),
       },
+      output: {
+        manualChunks: {
+          chart: ['chart.js', 'chartjs-adapter-date-fns', 'chartjs-plugin-zoom', 'date-fns'],
+        },
+      },
     },
   },
   server: {

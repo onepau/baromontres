@@ -30,6 +30,21 @@ const PAYWALL_PERIOD_DAYS: Record<string, number> = {
   annual_supporter: 365,
 };
 
+function observeSection(id: string, render: () => Promise<void>): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const obs = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting) {
+        obs.disconnect();
+        void render();
+      }
+    },
+    { rootMargin: "200px" },
+  );
+  obs.observe(el);
+}
+
 async function boot(): Promise<void> {
   setLang(getLang());
   bindLangSwitch(() => {
@@ -44,14 +59,10 @@ async function boot(): Promise<void> {
   bindRangeFilter();
   bindPaywallPeriods();
   bindBrandTabs();
-  await Promise.all([
-    renderChart(),
-    renderTopics(),
-    renderImageFlags(),
-    renderPaywallMeter(),
-    renderBrandLeaderboard(),
-    // renderSentimentPanel(), // on hold
-  ]);
+  await Promise.all([renderChart(), renderPaywallMeter()]);
+  observeSection("brand-list", () => renderBrandLeaderboard());
+  observeSection("topics", () => renderTopics());
+  observeSection("image-flags-list", () => renderImageFlags());
 }
 
 function setText(id: string, value: string): void {
