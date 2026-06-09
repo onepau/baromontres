@@ -1,4 +1,3 @@
-import "chartjs-adapter-date-fns";
 import { applyDom, bindLangSwitch, getLang, setLang, t } from "./i18n.ts";
 import {
   fetchBarometer,
@@ -11,7 +10,6 @@ import {
   type FlaggedImage,
   type SentimentPanel,
 } from "./api.ts";
-import { renderBarometer } from "./chart.ts";
 import type { BarometerPoint } from "@baromontres/shared/schema";
 import type { Chart } from "chart.js";
 
@@ -133,7 +131,10 @@ async function renderChart(): Promise<void> {
   const resetBtn = document.getElementById("reset-zoom");
   if (!canvas || !tooltipEl) return;
   try {
-    const { points, subscription } = await fetchBarometer();
+    const [{ renderBarometer }, { points, subscription }] = await Promise.all([
+      import("./chart.ts"),
+      fetchBarometer(),
+    ]);
     allPoints = points;
     currentSubscription = subscription?.price_chf ?? null;
     chart?.destroy();

@@ -16,18 +16,6 @@ export default defineConfig({
         main: resolve(here, 'src/index.html'),
         en: resolve(here, 'src/en/index.html'),
       },
-      output: {
-        manualChunks(id) {
-          if (
-            id.includes('/chart.js/') ||
-            id.includes('/chartjs-adapter-date-fns/') ||
-            id.includes('/chartjs-plugin-zoom/') ||
-            id.includes('/date-fns/')
-          ) {
-            return 'chart';
-          }
-        },
-      },
     },
   },
   server: {
