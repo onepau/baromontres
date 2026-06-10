@@ -39,11 +39,13 @@ export async function upsertArticle(
          title          = excluded.title,
          published_at   = excluded.published_at,
          source_id      = excluded.source_id,
-         is_paywalled   = excluded.is_paywalled,
-         unit_price_chf = excluded.unit_price_chf,
+         is_paywalled   = CASE WHEN excluded.unit_price_chf IS NOT NULL
+                               THEN excluded.is_paywalled
+                               ELSE article.is_paywalled END,
+         unit_price_chf = COALESCE(excluded.unit_price_chf, article.unit_price_chf),
          preview_text   = excluded.preview_text,
-         full_text      = excluded.full_text,
-         hero_image_url = excluded.hero_image_url,
+         full_text      = COALESCE(excluded.full_text, article.full_text),
+         hero_image_url = COALESCE(excluded.hero_image_url, article.hero_image_url),
          scraped_at     = excluded.scraped_at
        RETURNING id`,
     )
@@ -67,12 +69,22 @@ export async function upsertArticle(
 export async function listUnenriched(
   db: D1Database,
   limit: number,
+  excludeIds: number[] = [],
 ): Promise<ArticleRow[]> {
+  const exclusion =
+    excludeIds.length > 0
+      ? `AND id NOT IN (${excludeIds.map(() => "?").join(",")})`
+      : "";
   const { results } = await db
     .prepare(
-      `SELECT * FROM article WHERE enriched_at IS NULL ORDER BY published_at DESC LIMIT ?`,
+      `SELECT * FROM article
+        WHERE enriched_at IS NULL ${exclusion}
+        ORDER BY
+          CASE WHEN unit_price_chf IS NOT NULL THEN 0 ELSE 1 END,
+          published_at DESC
+        LIMIT ?`,
     )
-    .bind(limit)
+    .bind(...excludeIds, limit)
     .all<ArticleRow>();
   return results ?? [];
 }

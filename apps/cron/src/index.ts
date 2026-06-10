@@ -148,10 +148,17 @@ export default {
     }
     if (url.pathname === "/enrich" && req.method === "POST") {
       const batchParam = url.searchParams.get("batch");
+      const skipParam = url.searchParams.get("skip");
       const batch = batchParam ? clampInt(batchParam, 1, 50) : 5;
+      const skipIds = skipParam
+        ? skipParam
+            .split(",")
+            .map(Number)
+            .filter((n) => Number.isFinite(n) && n > 0)
+        : [];
       const selfUrl = `${url.origin}/enrich?batch=${batch}`;
-      ctx.waitUntil(drainEnrichment(env, batch, selfUrl));
-      return Response.json({ started: true, batch });
+      ctx.waitUntil(drainEnrichment(env, batch, selfUrl, skipIds));
+      return Response.json({ started: true, batch, skipping: skipIds.length });
     }
     if (url.pathname === "/scrape" && req.method === "POST") {
       const articleUrl = url.searchParams.get("url");
@@ -422,15 +429,17 @@ async function drainEnrichment(
   env: CronEnv,
   batchSize: number,
   selfUrl: string,
+  skipIds: number[] = [],
 ): Promise<void> {
   const BUDGET_MS = 25_000;
   const startedAt = Date.now();
-  const pending = await listUnenriched(env.DB, batchSize);
+  const pending = await listUnenriched(env.DB, batchSize, skipIds);
   if (pending.length === 0) {
     console.log("enrich drain: complete — no pending articles");
     return;
   }
   let enriched = 0;
+  const failedIds: number[] = [];
   for (const row of pending) {
     if (Date.now() - startedAt > BUDGET_MS) break;
     try {
@@ -438,15 +447,21 @@ async function drainEnrichment(
       enriched += 1;
     } catch (err) {
       console.error(`enrich failed: ${row.url} :: ${stringifyError(err)}`);
+      failedIds.push(row.id);
     }
   }
   console.log(
-    `enrich batch: size=${batchSize} pending=${pending.length} enriched=${enriched}`,
+    `enrich batch: size=${batchSize} pending=${pending.length} enriched=${enriched} failed=${failedIds.length}`,
   );
-  // Continue only if we made progress — prevents an infinite loop when a
-  // batch of articles consistently fails enrichment.
-  if (enriched > 0) {
-    await fetch(selfUrl, { method: "POST" });
+  // Continue if we made progress, or if articles failed but there may be
+  // others further down the queue worth trying. Cap the cumulative skip list
+  // at 100 IDs so the chain eventually stops when everything has been tried.
+  const allSkips = [...skipIds, ...failedIds];
+  const shouldContinue = enriched > 0 || (failedIds.length > 0 && allSkips.length <= 100);
+  if (shouldContinue) {
+    const skipSuffix =
+      allSkips.length > 0 ? `&skip=${allSkips.join(",")}` : "";
+    await fetch(`${selfUrl}${skipSuffix}`, { method: "POST" });
   }
 }
 
