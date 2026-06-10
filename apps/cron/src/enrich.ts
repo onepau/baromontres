@@ -295,7 +295,8 @@ async function callVisionWebDetection(
 
   if (!res.ok) {
     const detail = await res.text();
-    throw new Error(`vision ${res.status}: ${detail.slice(0, 400)}`);
+    console.error(`vision ${res.status}: ${detail.slice(0, 400)}`);
+    throw new Error(`vision request failed (${res.status})`);
   }
 
   const body = (await res.json()) as {
@@ -313,8 +314,10 @@ async function callVisionWebDetection(
 
   const response = body.responses?.[0];
   if (!response) return empty;
-  if (response.error)
-    throw new Error(`vision error: ${response.error.message}`);
+  if (response.error) {
+    console.error(`vision error: ${response.error.message}`);
+    throw new Error("vision request failed (api error)");
+  }
 
   const wd = response.webDetection;
   if (!wd) return empty;
@@ -343,17 +346,17 @@ function stringifyError(err: unknown): string {
 }
 
 function buildTextUserBlock(row: ArticleRow): string {
-  const lines = [
-    `Titre : ${row.title}`,
-    `Date : ${row.published_at}`,
-    `Article payant : ${row.is_paywalled ? "oui" : "non"}`,
-  ];
   const body = row.full_text ?? row.preview_text ?? "";
-  lines.push(
-    "",
+  return [
+    "<article>",
+    `<titre>${row.title}</titre>`,
+    `<date>${row.published_at}</date>`,
+    `<payant>${row.is_paywalled ? "oui" : "non"}</payant>`,
+    "<texte>",
     body || "(aucun texte disponible — utilise uniquement le titre)",
-  );
-  return lines.join("\n");
+    "</texte>",
+    "</article>",
+  ].join("\n");
 }
 
 interface ClaudeCallArgs {
@@ -395,7 +398,8 @@ async function callClaudeJson(
   });
   if (!res.ok) {
     const detail = await res.text();
-    throw new Error(`anthropic ${res.status}: ${detail.slice(0, 400)}`);
+    console.error(`anthropic ${res.status}: ${detail.slice(0, 400)}`);
+    throw new Error(`anthropic request failed (${res.status})`);
   }
   const body = (await res.json()) as {
     content?: Array<{ type: string; text?: string }>;

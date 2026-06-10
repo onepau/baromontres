@@ -19,11 +19,12 @@ database_id = "40793010-0c4d-4a80-a1af-963a50273fc5"
 
 # Set with: wrangler secret put ANTHROPIC_API_KEY
 # Set with: wrangler secret put GOOGLE_VISION_API_KEY
-# vars are not used; secrets only.
+# Set with: wrangler secret put CRON_TOKEN   (required — all HTTP endpoints except GET / check this)
 
 [vars]
-SCRAPE_LIMIT  = "500"
-ENRICH_LIMIT  = "100"
-LISTING_PAGES = "4"
-USER_AGENT    = "baromontres/2.0 (+https://github.com/onepau/baromontres)"
-SOURCE_BASE   = "https://www.businessmontres.com"
+SCRAPE_LIMIT    = "500"
+ENRICH_LIMIT    = "100"
+LISTING_PAGES   = "4"
+USER_AGENT      = "baromontres/2.0 (+https://github.com/onepau/baromontres)"
+SOURCE_BASE     = "https://www.businessmontres.com"
+CRON_PUBLIC_URL = "https://baromontres-cron.onepau.workers.dev"

@@ -26,6 +26,15 @@ const KEYWORD_KINDS: ReadonlySet<KeywordKind> = new Set([
   "model",
 ]);
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateSince(since: string | undefined): Response | null {
+  if (since !== undefined && !ISO_DATE_RE.test(since)) {
+    return Response.json({ error: "invalid since: expected YYYY-MM-DD" }, { status: 400 });
+  }
+  return null;
+}
+
 export function createApi(): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -35,6 +44,8 @@ export function createApi(): Hono<{ Bindings: Env }> {
 
   app.get("/api/barometer", async (c) => {
     const since = c.req.query("since") ?? undefined;
+    const sinceErr = validateSince(since);
+    if (sinceErr) return sinceErr;
     const limitParam = c.req.query("limit");
     const limit = limitParam
       ? Math.min(5000, Math.max(1, Number(limitParam)))
@@ -59,7 +70,12 @@ export function createApi(): Hono<{ Bindings: Env }> {
     if (!Number.isFinite(id)) return c.json({ error: "invalid id" }, 400);
     const detail = await getArticleDetail(c.env.DB, id);
     if (!detail) return c.json({ error: "not found" }, 404);
-    return c.json(detail);
+    // Strip internal diagnostic fields not meant for public consumption.
+    const sanitized = {
+      ...detail,
+      images: detail.images.map(({ notes: _notes, ...img }) => img),
+    };
+    return c.json(sanitized);
   });
 
   app.get("/api/keywords", async (c) => {
@@ -114,12 +130,16 @@ export function createApi(): Hono<{ Bindings: Env }> {
 
   app.get("/api/paywall", async (c) => {
     const since = c.req.query("since") ?? undefined;
+    const sinceErr = validateSince(since);
+    if (sinceErr) return sinceErr;
     const stats = await getPaywallStats(c.env.DB, { since });
     return c.json(stats);
   });
 
   app.get("/api/brands", async (c) => {
     const since = c.req.query("since") ?? undefined;
+    const sinceErr = validateSince(since);
+    if (sinceErr) return sinceErr;
     const limitParam = c.req.query("limit");
     const minCountParam = c.req.query("min_count");
     const limit = limitParam
@@ -153,6 +173,8 @@ export function createApi(): Hono<{ Bindings: Env }> {
 
   app.get("/api/sentiment/panel", async (c) => {
     const since = c.req.query("since") ?? undefined;
+    const sinceErr = validateSince(since);
+    if (sinceErr) return sinceErr;
     const panel = await getSentimentPanel(c.env.DB, { since });
     return c.json(panel);
   });

@@ -57,6 +57,8 @@ interface CronEnv extends Env {
   LISTING_PAGES: string;
   USER_AGENT: string;
   SOURCE_BASE: string;
+  CRON_TOKEN: string;
+  CRON_PUBLIC_URL: string;
 }
 
 export default {
@@ -73,6 +75,18 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(req.url);
+
+    // Public health check — no auth required (used by deploy smoke tests).
+    if (url.pathname === "/" && req.method === "GET") {
+      return new Response("baromontres cron worker", { status: 200 });
+    }
+
+    // All other endpoints require a bearer token.
+    const token = env.CRON_TOKEN;
+    if (!token || req.headers.get("authorization") !== `Bearer ${token}`) {
+      return new Response("unauthorized", { status: 401 });
+    }
+
     if (url.pathname === "/probe" && req.method === "GET") {
       const pageParam = url.searchParams.get("page");
       const page = pageParam ? clampInt(pageParam, 1, 1000) : 1;
@@ -149,14 +163,16 @@ export default {
     if (url.pathname === "/enrich" && req.method === "POST") {
       const batchParam = url.searchParams.get("batch");
       const batch = batchParam ? clampInt(batchParam, 1, 50) : 5;
-      const selfUrl = `${url.origin}/enrich?batch=${batch}`;
-      ctx.waitUntil(drainEnrichment(env, batch, selfUrl));
+      const selfUrl = `${env.CRON_PUBLIC_URL}/enrich?batch=${batch}`;
+      ctx.waitUntil(drainEnrichment(env, batch, selfUrl, env.CRON_TOKEN));
       return Response.json({ started: true, batch });
     }
     if (url.pathname === "/scrape" && req.method === "POST") {
       const articleUrl = url.searchParams.get("url");
       if (!articleUrl)
         return Response.json({ error: "missing ?url=" }, { status: 400 });
+      if (!isAllowedScrapingUrl(articleUrl))
+        return Response.json({ error: "url not allowed" }, { status: 400 });
       const enrich = url.searchParams.get("enrich") === "1";
       const forceEnrich = url.searchParams.get("force_enrich") === "1";
       const parsed = await fetchAndParse(articleUrl, env.USER_AGENT);
@@ -196,7 +212,7 @@ export default {
         .first<{ n: number }>();
       return Response.json({ term, count: row?.n ?? 0 });
     }
-    return new Response("baromontres cron worker", { status: 200 });
+    return new Response("not found", { status: 404 });
   },
 };
 
@@ -422,6 +438,7 @@ async function drainEnrichment(
   env: CronEnv,
   batchSize: number,
   selfUrl: string,
+  cronToken: string,
 ): Promise<void> {
   const BUDGET_MS = 25_000;
   const startedAt = Date.now();
@@ -446,7 +463,10 @@ async function drainEnrichment(
   // Continue only if we made progress — prevents an infinite loop when a
   // batch of articles consistently fails enrichment.
   if (enriched > 0) {
-    await fetch(selfUrl, { method: "POST" });
+    await fetch(selfUrl, {
+      method: "POST",
+      headers: { authorization: `Bearer ${cronToken}` },
+    });
   }
 }
 
@@ -464,4 +484,21 @@ function clampInt(raw: string, lo: number, hi: number): number {
 function parseIsoDate(raw: string | null): string | undefined {
   if (!raw) return undefined;
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+}
+
+function isAllowedScrapingUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:") return false;
+  const h = u.hostname.toLowerCase();
+  // Block loopback, private, and link-local ranges (prevents SSRF to internal services).
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1") return false;
+  if (/^10\./.test(h) || /^192\.168\./.test(h)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+  if (/^169\.254\./.test(h)) return false;
+  return true;
 }

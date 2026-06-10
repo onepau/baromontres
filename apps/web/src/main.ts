@@ -379,7 +379,7 @@ function flagNode(f: FlaggedImage): HTMLElement {
   const li = document.createElement("li");
 
   const imgLink = document.createElement("a");
-  imgLink.href = f.url;
+  imgLink.href = safeHref(f.url);
   imgLink.target = "_blank";
   imgLink.rel = "noopener";
   imgLink.setAttribute("aria-label", f.title);
@@ -419,6 +419,15 @@ function flagNode(f: FlaggedImage): HTMLElement {
 
   li.append(imgLink, body);
   return li;
+}
+
+function safeHref(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "#";
+  } catch {
+    return "#";
+  }
 }
 
 function formatShortDate(iso: string, lang: "fr" | "en"): string {
