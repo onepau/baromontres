@@ -1,4 +1,3 @@
-import "chartjs-adapter-date-fns";
 import { applyDom, bindLangSwitch, getLang, setLang, t } from "./i18n.ts";
 import {
   fetchBarometer,
@@ -11,7 +10,6 @@ import {
   type FlaggedImage,
   type SentimentPanel,
 } from "./api.ts";
-import { renderBarometer } from "./chart.ts";
 import type { BarometerPoint } from "@baromontres/shared/schema";
 import type { Chart } from "chart.js";
 
@@ -30,6 +28,21 @@ const PAYWALL_PERIOD_DAYS: Record<string, number> = {
   annual_supporter: 365,
 };
 
+function observeSection(id: string, render: () => Promise<void>): void {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const obs = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting) {
+        obs.disconnect();
+        void render();
+      }
+    },
+    { rootMargin: "200px" },
+  );
+  obs.observe(el);
+}
+
 async function boot(): Promise<void> {
   setLang(getLang());
   bindLangSwitch(() => {
@@ -44,14 +57,10 @@ async function boot(): Promise<void> {
   bindRangeFilter();
   bindPaywallPeriods();
   bindBrandTabs();
-  await Promise.all([
-    renderChart(),
-    renderTopics(),
-    renderImageFlags(),
-    renderPaywallMeter(),
-    renderBrandLeaderboard(),
-    // renderSentimentPanel(), // on hold
-  ]);
+  await Promise.all([renderChart(), renderPaywallMeter()]);
+  observeSection("brand-list", () => renderBrandLeaderboard());
+  observeSection("topics", () => renderTopics());
+  observeSection("image-flags-list", () => renderImageFlags());
 }
 
 function setText(id: string, value: string): void {
@@ -122,7 +131,10 @@ async function renderChart(): Promise<void> {
   const resetBtn = document.getElementById("reset-zoom");
   if (!canvas || !tooltipEl) return;
   try {
-    const { points, subscription } = await fetchBarometer();
+    const [{ renderBarometer }, { points, subscription }] = await Promise.all([
+      import("./chart.ts"),
+      fetchBarometer(),
+    ]);
     allPoints = points;
     currentSubscription = subscription?.price_chf ?? null;
     chart?.destroy();
@@ -367,7 +379,7 @@ function flagNode(f: FlaggedImage): HTMLElement {
   const li = document.createElement("li");
 
   const imgLink = document.createElement("a");
-  imgLink.href = f.url;
+  imgLink.href = safeHref(f.url);
   imgLink.target = "_blank";
   imgLink.rel = "noopener";
   imgLink.setAttribute("aria-label", f.title);
@@ -407,6 +419,15 @@ function flagNode(f: FlaggedImage): HTMLElement {
 
   li.append(imgLink, body);
   return li;
+}
+
+function safeHref(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "#";
+  } catch {
+    return "#";
+  }
 }
 
 function formatShortDate(iso: string, lang: "fr" | "en"): string {

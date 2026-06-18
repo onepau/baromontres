@@ -40,7 +40,7 @@ export async function fetchBarometer(
   const url = since
     ? `/api/barometer?since=${encodeURIComponent(since)}`
     : "/api/barometer";
-  const res = await fetch(url);
+  const res = await fetch(url, { priority: "high" } as RequestInit);
   if (!res.ok) throw new Error(`barometer ${res.status}`);
   return res.json();
 }

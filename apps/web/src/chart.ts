@@ -1,3 +1,4 @@
+import "chartjs-adapter-date-fns";
 import {
   Chart,
   LineController,
@@ -207,7 +208,7 @@ function renderHtmlTooltip(
   const dateStr = formatDate(p.published_at, lang);
 
   el.innerHTML = `
-    <a href="${escapeAttr(p.url)}" target="_blank" rel="noopener">${escapeHtml(p.title)}</a>
+    <a href="${escapeAttr(safeHref(p.url))}" target="_blank" rel="noopener">${escapeHtml(p.title)}</a>
     <div class="tt-meta">${t("tooltipDate")} ${escapeHtml(dateStr)} · ${escapeHtml(paywall)}</div>
     <div class="tt-meta">${t("tooltipPrice")}: <strong>${p.unit_price_chf.toFixed(2)} CHF</strong></div>
     <div class="tt-sentiment"><span class="dot ${sentimentDot}"></span>${escapeHtml(sentimentLabel)}</div>
@@ -263,6 +264,15 @@ function noDataNode(): HTMLElement {
   div.dataset.i18n = "noData";
   div.textContent = t("noData");
   return div;
+}
+
+function safeHref(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "#";
+  } catch {
+    return "#";
+  }
 }
 
 function escapeHtml(s: string): string {
