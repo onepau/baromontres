@@ -585,6 +585,43 @@ a {
   margin: 0 0 14px;
 }
 
+.brand-periods {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin: 0 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.brand-periods button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 999px;
+  transition:
+    color 200ms ease,
+    background 200ms ease;
+}
+
+.brand-periods button:hover {
+  color: var(--fg);
+}
+
+.brand-periods button[aria-pressed="true"] {
+  color: #18181b;
+  background: var(--accent);
+  box-shadow: 0 4px 16px -4px rgba(251, 191, 36, 0.5);
+}
+
 .brand-tabs {
   display: inline-flex;
   flex-wrap: wrap;

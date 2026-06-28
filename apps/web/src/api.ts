@@ -99,11 +99,13 @@ export interface BrandLeaderboardRow {
 export async function fetchBrands(
   limit = 20,
   minCount = 3,
+  since?: string,
 ): Promise<BrandLeaderboardRow[]> {
   const params = new URLSearchParams({
     limit: String(limit),
     min_count: String(minCount),
   });
+  if (since) params.set("since", since);
   const res = await fetch(`/api/brands?${params.toString()}`);
   if (!res.ok) throw new Error(`brands ${res.status}`);
   const data = (await res.json()) as { brands: BrandLeaderboardRow[] };
