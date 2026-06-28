@@ -20,6 +20,8 @@ let allPoints: BarometerPoint[] = [];
 let currentSubscription: number | null = null;
 let currentPaywallPeriod = "monthly";
 let brandRows: BrandLeaderboardRow[] = [];
+let currentBrandPeriod = "all";
+let currentBrandView = "coverage";
 let sentimentPanel: SentimentPanel | null = null;
 
 const PAYWALL_PERIOD_DAYS: Record<string, number> = {
@@ -43,6 +45,7 @@ async function boot(): Promise<void> {
   bindResetZoom();
   bindRangeFilter();
   bindPaywallPeriods();
+  bindBrandPeriods();
   bindBrandTabs();
   await Promise.all([
     renderChart(),
@@ -234,10 +237,20 @@ function bindPaywallPeriods(): void {
   }
 }
 
-async function renderBrandLeaderboard(view = "coverage"): Promise<void> {
+function periodToSince(period: string): string | undefined {
+  const days: Record<string, number> = { "30d": 30, "90d": 90, "1y": 365 };
+  const d = days[period];
+  if (!d) return undefined;
+  return new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10);
+}
+
+async function renderBrandLeaderboard(): Promise<void> {
+  const view = currentBrandView;
   if (brandRows.length === 0) {
+    const list = document.getElementById("brand-list");
+    if (list) list.replaceChildren();
     try {
-      brandRows = await fetchBrands(20, 3);
+      brandRows = await fetchBrands(20, 3, periodToSince(currentBrandPeriod));
     } catch (err) {
       console.error(err);
       return;
@@ -283,19 +296,39 @@ async function renderBrandLeaderboard(view = "coverage"): Promise<void> {
   );
 }
 
+function bindBrandPeriods(): void {
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(
+    ".brand-periods button",
+  )) {
+    btn.addEventListener("click", () => {
+      currentBrandPeriod = btn.dataset.period ?? "all";
+      brandRows = [];
+      void renderBrandLeaderboard();
+      for (const b of document.querySelectorAll<HTMLButtonElement>(
+        ".brand-periods button",
+      )) {
+        b.setAttribute(
+          "aria-pressed",
+          b.dataset.period === currentBrandPeriod ? "true" : "false",
+        );
+      }
+    });
+  }
+}
+
 function bindBrandTabs(): void {
   for (const btn of document.querySelectorAll<HTMLButtonElement>(
     ".brand-tabs button",
   )) {
     btn.addEventListener("click", () => {
-      const view = btn.dataset.view ?? "coverage";
-      void renderBrandLeaderboard(view);
+      currentBrandView = btn.dataset.view ?? "coverage";
+      void renderBrandLeaderboard();
       for (const b of document.querySelectorAll<HTMLButtonElement>(
         ".brand-tabs button",
       )) {
         b.setAttribute(
           "aria-pressed",
-          b.dataset.view === view ? "true" : "false",
+          b.dataset.view === currentBrandView ? "true" : "false",
         );
       }
     });
