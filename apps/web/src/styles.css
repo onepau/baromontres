@@ -244,23 +244,11 @@ a {
   filter: blur(80px);
   pointer-events: none;
   z-index: 0;
-  animation: halo-drift 12s ease-in-out infinite alternate;
 }
 
 .chart-section > * {
   position: relative;
   z-index: 1;
-}
-
-@keyframes halo-drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.85;
-  }
-  100% {
-    transform: translate3d(-12%, 8%, 0) scale(1.1);
-    opacity: 1;
-  }
 }
 
 @keyframes fade-up {

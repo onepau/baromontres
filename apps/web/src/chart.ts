@@ -1,3 +1,4 @@
+import "chartjs-adapter-date-fns";
 import {
   Chart,
   LineController,

@@ -1,4 +1,3 @@
-import "chartjs-adapter-date-fns";
 import { applyDom, bindLangSwitch, getLang, setLang, t } from "./i18n.ts";
 import {
   fetchBarometer,
@@ -11,7 +10,6 @@ import {
   type FlaggedImage,
   type SentimentPanel,
 } from "./api.ts";
-import { renderBarometer } from "./chart.ts";
 import type { BarometerPoint } from "@baromontres/shared/schema";
 import type { Chart } from "chart.js";
 
@@ -47,14 +45,18 @@ async function boot(): Promise<void> {
   bindPaywallPeriods();
   bindBrandPeriods();
   bindBrandTabs();
-  await Promise.all([
-    renderChart(),
-    renderTopics(),
-    renderImageFlags(),
-    renderPaywallMeter(),
-    renderBrandLeaderboard(),
-    // renderSentimentPanel(), // on hold
-  ]);
+  await Promise.all([renderChart(), renderPaywallMeter()]);
+  defer(() => {
+    void renderTopics();
+    void renderImageFlags();
+    void renderBrandLeaderboard();
+    // void renderSentimentPanel(); // on hold
+  });
+}
+
+function defer(cb: () => void): void {
+  if (typeof requestIdleCallback !== "undefined") requestIdleCallback(cb);
+  else setTimeout(cb, 0);
 }
 
 function setText(id: string, value: string): void {
@@ -125,7 +127,10 @@ async function renderChart(): Promise<void> {
   const resetBtn = document.getElementById("reset-zoom");
   if (!canvas || !tooltipEl) return;
   try {
-    const { points, subscription } = await fetchBarometer();
+    const [{ points, subscription }, { renderBarometer }] = await Promise.all([
+      fetchBarometer(),
+      import("./chart.ts"),
+    ]);
     allPoints = points;
     currentSubscription = subscription?.price_chf ?? null;
     chart?.destroy();
