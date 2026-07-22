@@ -51,6 +51,10 @@ export function createApi(): Hono<{ Bindings: Env }> {
       getBarometer(c.env.DB, { since, limit, lang, sourceId }),
       latestSubscriptionPrice(c.env.DB),
     ]);
+    c.header(
+      "Cache-Control",
+      "public, s-maxage=300, stale-while-revalidate=3600",
+    );
     return c.json({ points, subscription });
   });
 
