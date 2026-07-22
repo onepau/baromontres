@@ -28,7 +28,15 @@ export default {
   ): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
-      return env.ASSETS.fetch(request);
+      const response = await env.ASSETS.fetch(request);
+      // Content-hashed assets are safe to cache indefinitely in browsers and
+      // at the CF edge — the filename changes on every rebuild.
+      if (url.pathname.startsWith("/assets/") && response.ok) {
+        const r = new Response(response.body, response);
+        r.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+        return r;
+      }
+      return response;
     }
 
     if (isCacheableRequest(request.method, url.pathname)) {
