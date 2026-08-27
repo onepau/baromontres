@@ -17,9 +17,29 @@
   --shadow:
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
     0 24px 60px -20px rgba(0, 0, 0, 0.55);
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --display: "Inter Display", "Inter", system-ui, -apple-system, sans-serif;
-  --serif: "Instrument Serif", "Playfair Display", "Georgia", serif;
+  /* Typographic system shared with gphg.tick-ticker.com. The two sites keep their own
+     grounds — this one dark and amber, the index light and blue — because a palette has to
+     serve its background; a surface of rgba(255,255,255,.04) means nothing on paper. What
+     carries the family resemblance is the type: the same faces in the same roles, and the
+     same uppercase letterspaced micro-label treatment.
+
+     Role                     here            gphg.tick-ticker.com
+     hero / h1                DM Serif Display   --display   (identical)
+     section headings         Fraunces           --serif     (identical)
+     body                     IBM Plex Sans      --sans      (identical)
+     figures, labels, buttons Archivo            --label     (identical)
+     large display figures    Spectral           --serif-num (identical)
+
+     --mono is kept as a name so the ~11 existing call sites need no edit, but it now
+     resolves to Archivo with tabular figures — the same thing gphg's `.mono` class does.
+     Archivo's tabular numerals column up as well as a true monospace here and drop a whole
+     font family from the page weight. */
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --label: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: var(--label);
+  --figure: "Spectral", Georgia, serif;
+  --display: "Fraunces", Georgia, serif;
+  --serif: "DM Serif Display", Georgia, serif;
 }
 
 * {
@@ -43,12 +63,7 @@ body {
     ),
     var(--bg);
   color: var(--fg);
-  font-family:
-    "Inter",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Helvetica Neue",
-    sans-serif;
+  font-family: var(--sans);
   font-size: 15px;
   line-height: 1.55;
   min-height: 100vh;
@@ -87,8 +102,9 @@ a {
   margin: 0;
   font-family: var(--serif);
   font-size: 44px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  /* DM Serif Display ships one weight; asking for 500 triggers synthetic bolding. */
+  font-weight: 400;
+  letter-spacing: -0.01em;
   line-height: 1;
   background: linear-gradient(180deg, #ffffff 0%, #c7c7cc 100%);
   -webkit-background-clip: text;
@@ -152,7 +168,7 @@ a {
 
 .intro h2 {
   font-family: var(--display);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 22px;
   letter-spacing: -0.01em;
   margin: 0 0 8px;
@@ -283,7 +299,7 @@ a {
   font-weight: 600;
   font-size: 17px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .chart-wrap {
@@ -476,7 +492,7 @@ a {
 
 .paywall-meter h2 {
   font-family: var(--display);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 22px;
   letter-spacing: -0.01em;
   margin: 0 0 12px;
@@ -536,11 +552,11 @@ a {
 }
 
 .paywall-stat strong {
-  font-family: var(--mono);
-  font-size: 28px;
-  font-weight: 700;
+  font-family: var(--figure);
+  font-size: 30px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--fg);
 }
 
@@ -687,7 +703,7 @@ a {
 .brand-net {
   font-family: var(--mono);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   min-width: 36px;
   text-align: right;
@@ -911,7 +927,7 @@ footer {
 .source-lang {
   font-family: var(--mono);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--muted);
   background: var(--line);
@@ -930,7 +946,7 @@ footer {
 .source-net {
   font-family: var(--mono);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   min-width: 42px;
   text-align: right;
