@@ -27,7 +27,6 @@ jobs:
       - run: pnpm install
 
       - run: pnpm test
-        continue-on-error: true
 
       - run: pnpm build
 
@@ -42,3 +41,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test
+        run: |
+          curl -sf https://baromontres.onepau.workers.dev/api/health
+          curl -sf "https://baromontres.onepau.workers.dev/api/barometer?limit=1"
+          curl -sf https://baromontres-cron.onepau.workers.dev/

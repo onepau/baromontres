@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <!-- Google Analytics 4, served first-party via Cloudflare's Google tag gateway: the
          loader comes from /analytics on this origin, not googletagmanager.com.
@@ -26,17 +26,22 @@
         t.src = "https://www.clarity.ms/tag/" + i;
         y = l.getElementsByTagName(r)[0];
         y.parentNode.insertBefore(t, y);
-      })(window, document, "clarity", "script", "y4vvu78l0w");
+      })(window, document, "clarity", "script", "y4vv4iyyrr");
     </script>
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2463271452765112"
+      crossorigin="anonymous"
+    ></script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tick ticker — Baromètre de la presse horlogère francophone</title>
+    <title>Tick ticker — French watch press price barometer</title>
     <meta
       name="description"
-      content="Baromètre de prix et d'humeur des articles de businessmontres.com"
+      content="Track price trends and editorial sentiment in the French-language watch press. Daily-updated barometer of articles from businessmontres.com."
     />
 
-    <link rel="canonical" href="https://tick-ticker.com/" />
+    <link rel="canonical" href="https://tick-ticker.com/en" />
     <link rel="alternate" hreflang="fr" href="https://tick-ticker.com/" />
     <link rel="alternate" hreflang="en" href="https://tick-ticker.com/en" />
     <link
@@ -49,25 +54,25 @@
     <meta property="og:site_name" content="Tick ticker" />
     <meta
       property="og:title"
-      content="Tick ticker — Baromètre de la presse horlogère francophone"
+      content="Tick ticker — French watch press price barometer"
     />
     <meta
       property="og:description"
-      content="Baromètre de prix et d'humeur des articles de businessmontres.com"
+      content="Track price trends and editorial sentiment in the French-language watch press. Daily-updated barometer of articles from businessmontres.com."
     />
-    <meta property="og:url" content="https://tick-ticker.com/" />
+    <meta property="og:url" content="https://tick-ticker.com/en" />
     <meta property="og:image" content="https://tick-ticker.com/og.png" />
-    <meta property="og:locale" content="fr_FR" />
-    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="fr_FR" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Tick ticker — Baromètre de la presse horlogère francophone"
+      content="Tick ticker — French watch press price barometer"
     />
     <meta
       name="twitter:description"
-      content="Baromètre de prix et d'humeur des articles de businessmontres.com"
+      content="Track price trends and editorial sentiment in the French-language watch press. Daily-updated barometer of articles from businessmontres.com."
     />
     <meta name="twitter:image" content="https://tick-ticker.com/og.png" />
 
@@ -75,17 +80,17 @@
       {
         "@context": "https://schema.org",
         "@type": "Dataset",
-        "name": "Tick ticker — Baromètre des prix de la presse horlogère francophone",
-        "description": "Baromètre de prix et d'humeur des articles de la presse horlogère francophone, mis à jour quotidiennement à partir de businessmontres.com.",
-        "url": "https://tick-ticker.com/",
-        "inLanguage": "fr",
+        "name": "Tick ticker — French watch press price barometer",
+        "description": "Price and editorial-sentiment time series for articles published by the French-language watch press, refreshed daily from businessmontres.com.",
+        "url": "https://tick-ticker.com/en",
+        "inLanguage": "en",
         "keywords": [
-          "montres",
-          "presse horlogère",
+          "watches",
+          "watch press",
           "businessmontres.com",
-          "prix",
-          "analyse de sentiment",
-          "baromètre"
+          "prices",
+          "sentiment analysis",
+          "barometer"
         ],
         "isAccessibleForFree": true,
         "creator": {
@@ -114,7 +119,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Spectral:wght@500;600&family=Archivo:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="../styles.css" />
   </head>
   <body>
     <header class="site-header">
@@ -123,8 +128,8 @@
         <p class="tagline" data-i18n="tagline"></p>
       </div>
       <nav class="lang-switch" aria-label="Language">
-        <button data-lang="fr" aria-pressed="true">FR</button>
-        <button data-lang="en" aria-pressed="false">EN</button>
+        <button data-lang="fr" aria-pressed="false">FR</button>
+        <button data-lang="en" aria-pressed="true">EN</button>
       </nav>
     </header>
 
@@ -255,10 +260,10 @@
       <section class="brand-leaderboard" aria-label="brand leaderboard">
         <h2 data-i18n="brandsTitle"></h2>
         <nav class="brand-periods" aria-label="leaderboard period">
-          <button data-period="30d" aria-pressed="false">30j</button>
-          <button data-period="90d" aria-pressed="false">90j</button>
-          <button data-period="1y" aria-pressed="false">1 an</button>
-          <button data-period="all" aria-pressed="true">Tout</button>
+          <button data-period="30d" aria-pressed="false">30d</button>
+          <button data-period="90d" aria-pressed="false">90d</button>
+          <button data-period="1y" aria-pressed="false">1y</button>
+          <button data-period="all" aria-pressed="true">All</button>
         </nav>
         <nav class="brand-tabs" aria-label="leaderboard view">
           <button
@@ -310,6 +315,6 @@
       </p>
     </footer>
 
-    <script type="module" src="./main.ts"></script>
+    <script type="module" src="../main.ts"></script>
   </body>
 </html>
