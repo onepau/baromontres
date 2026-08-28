@@ -1,13 +1,18 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Google tag: no snippet here on purpose.
-         GA4 (G-9ZCDZDCE1P) is injected for this zone by Cloudflare's Google tag gateway,
-         which serves it first-party from /analytics instead of googletagmanager.com. The
-         hard-coded gtag.js snippet that used to sit here was NOT removed when the gateway
-         was switched on, so from 2026-08-28 both tags fired and every pageview was counted
-         twice — two config calls, two collect requests, neither using the first-party path.
-         Re-adding a snippet here would restore exactly that. -->
+    <!-- Google Analytics 4, served first-party via Cloudflare's Google tag gateway: the
+         loader comes from /analytics on this origin, not googletagmanager.com.
+
+         Do not inline the config here. It lived inline in both this file and en/index.html
+         until 2026-08-28, and when the tag gateway was switched on it was not removed, so
+         two tags fired and every pageview was counted twice. It now lives once in
+         /ga4.js, shared by both entry points, where it cannot drift between them.
+
+         Zaraz previously injected a tag of its own for this zone and has been disabled;
+         re-enabling it without removing this would restore the double-count. -->
+    <script async src="/analytics/gtag/js?id=G-9ZCDZDCE1P"></script>
+    <script src="/ga4.js"></script>
     <!-- Microsoft Clarity -->
     <script type="text/javascript">
       (function (c, l, a, r, i, t, y) {
