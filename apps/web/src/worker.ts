@@ -20,6 +20,21 @@ function isCacheableRequest(method: string, pathname: string): boolean {
   );
 }
 
+// This worker is the barometer app on its PROTECTED deployment (workers.dev,
+// behind Cloudflare Access) — it is no longer the public apex. Stamp every
+// response with a noindex directive so that if a preview hostname is ever
+// discovered before Access is in place, nothing here enters a search index. The
+// public hub at tick-ticker.com is served by the separate `tick-ticker-hub`
+// worker; see docs/RETIRE_BAROMETER.md.
+//
+// NOTE: because this deindexes everything it serves, this build must only be
+// deployed to the protected host, never to the tick-ticker.com apex.
+function withNoindex(response: Response): Response {
+  const r = new Response(response.body, response);
+  r.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return r;
+}
+
 export default {
   async fetch(
     request: Request,
@@ -34,23 +49,23 @@ export default {
       if (url.pathname.startsWith("/assets/") && response.ok) {
         const r = new Response(response.body, response);
         r.headers.set("Cache-Control", "public, max-age=31536000, immutable");
-        return r;
+        return withNoindex(r);
       }
-      return response;
+      return withNoindex(response);
     }
 
     if (isCacheableRequest(request.method, url.pathname)) {
       const cache = caches.default;
       const cached = await cache.match(request);
-      if (cached) return cached;
+      if (cached) return withNoindex(cached);
 
       const response = await api.fetch(request, env, ctx);
       if (response.ok) {
         ctx.waitUntil(cache.put(request, response.clone()));
       }
-      return response;
+      return withNoindex(response);
     }
 
-    return api.fetch(request, env, ctx);
+    return withNoindex(await api.fetch(request, env, ctx));
   },
 };
