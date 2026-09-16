@@ -110,5 +110,5 @@ from the repo.
   deliberately **deferred to December/January**, after the 7 November GPHG ceremony —
   it causes a temporary ranking dip and must not run during the peak window.
 - **Stray Monetag service-worker files** (`apps/web/sw.js`, `apps/web/src/sw.js`,
-  loading `5gvci.com`, from commit `b92c720`) are unreferenced and not shipped to
-  `dist/`. Left in place pending an explicit decision to remove them.
+  loading `5gvci.com`, from commit `b92c720`) were unreferenced and never shipped to
+  `dist/`; **removed** in this branch now that the barometer is off the public apex.
