@@ -18,7 +18,7 @@ export interface Env {
 }
 
 // Retired barometer surface. `/api` and anything under `/api/`, plus the
-// barometer's llms.txt. The hub's own files (/, /en/, robots.txt, sitemap.xml,
+// barometer's llms.txt. The hub's own files (/, robots.txt, sitemap.xml,
 // ga4.js) are served normally.
 function isRetired(pathname: string): boolean {
   if (pathname === "/llms.txt") return true;
@@ -26,9 +26,20 @@ function isRetired(pathname: string): boolean {
   return false;
 }
 
+// The hub is English-only. `/en` and `/en/` were the old bilingual apex's
+// English path (indexed under the retired barometer); redirect them to the
+// single canonical home so that URL's equity consolidates onto `/`.
+function isLegacyEnglishPath(pathname: string): boolean {
+  return pathname === "/en" || pathname === "/en/";
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (isLegacyEnglishPath(url.pathname)) {
+      return Response.redirect(new URL("/", url).toString(), 301);
+    }
 
     if (isRetired(url.pathname)) {
       return new Response(

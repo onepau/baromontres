@@ -12,7 +12,7 @@ pipeline still feeds blog content. Nothing here deletes application code or data
 
 | Area                                           | Before                                                               | After                                                                                                                                                        |
 | ---------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Apex `tick-ticker.com`                         | `baromontres` web worker serving the barometer SPA + public `/api/*` | New `tick-ticker-hub` worker: static bilingual hub at `/` and `/en/`, **410 + noindex** for `/api/*` and `/llms.txt`                                         |
+| Apex `tick-ticker.com`                         | `baromontres` web worker serving the barometer SPA + public `/api/*` | New `tick-ticker-hub` worker: static English hub at `/` (old `/en/` → **301** `/`), **410 + noindex** for `/api/*` and `/llms.txt`                           |
 | Barometer app (`apps/web` → `baromontres`)     | Public at the apex                                                   | Same code, now stamped `X-Robots-Tag: noindex, nofollow` on every response and `robots.txt: Disallow: /`, for a **protected** workers.dev host behind Access |
 | Cron worker (`apps/cron` → `baromontres-cron`) | Daily scrape+enrich, binds D1 directly                               | **Unchanged** — pipeline keeps running                                                                                                                       |
 | D1 (`baromontres`)                             | —                                                                    | **Unchanged** — same database, same bindings                                                                                                                 |
@@ -23,9 +23,11 @@ New files: `apps/hub/**`. Modified: `apps/web/src/worker.ts`, `apps/web/public/r
 
 The apex root **is** the barometer homepage — the only indexed apex URLs are `/`
 and `/en/` (the whole SPA). There is no set of separate barometer routes to 410
-next to a surviving hub. So the safe move is to **replace** the SPA at `/` and
-`/en/` with the hub (which stays 200 and indexable) and reserve 410 + noindex for
-the barometer's distinct public surface: the JSON API `/api/*` and `/llms.txt`.
+next to a surviving hub. So the safe move is to **replace** the SPA at `/` with the
+hub (which stays 200 and indexable) and reserve 410 + noindex for the barometer's
+distinct public surface: the JSON API `/api/*` and `/llms.txt`. The hub is
+English-only, so the old English path `/en/` **301-redirects to `/`**, consolidating
+that URL's equity onto the single home.
 
 `robots.txt` `Disallow` for those paths is deliberately **not** added on the apex:
 Disallow blocks crawling, and a path that cannot be crawled cannot be seen to
@@ -44,7 +46,7 @@ A hostname binds to exactly one Worker, so the apex must be handed from
    cd apps/hub && wrangler deploy
    ```
 
-   Verify on the `*.workers.dev` URL: `/` and `/en/` return 200 HTML; `/api/health`
+   Verify on the `*.workers.dev` URL: `/` returns 200 HTML, `/en/` → 301 `/`; `/api/health`
    and `/api/barometer` return 410 with `x-robots-tag: noindex`; `/robots.txt` and
    `/sitemap.xml` serve.
 
@@ -59,7 +61,7 @@ A hostname binds to exactly one Worker, so the apex must be handed from
    cd apps/hub && wrangler deploy
    ```
 
-   Verify `https://tick-ticker.com/` → 200 hub, `/en/` → 200, `/api/health` → 410.
+   Verify `https://tick-ticker.com/` → 200 hub, `/en/` → 301 `/`, `/api/health` → 410.
 
 4. **Redeploy the now-protected barometer** so the noindex header and Disallow
    ship on its workers.dev host:
@@ -93,9 +95,9 @@ from the repo.
 
 ## Verification checklist (Phase 7)
 
-- [ ] Apex `/` and `/en/` → 200, indexable (no `x-robots-tag` noindex), hub content.
+- [ ] Apex `/` → 200, indexable (no `x-robots-tag` noindex), English hub content; `/en/` → 301 `/`.
 - [ ] Apex `/api/health`, `/api/barometer`, `/llms.txt` → 410 with `x-robots-tag: noindex`.
-- [ ] Apex sitemap contains only `/` and `/en/`; no barometer/API entries.
+- [ ] Apex sitemap contains only `/`; no barometer/API entries.
 - [ ] `gphg.tick-ticker.com` and `blog.tick-ticker.com` sitemaps unchanged and valid.
 - [ ] Barometer host unreachable without Access; serves `x-robots-tag: noindex` and `Disallow: /`.
 - [ ] `baromontres-cron` still runs; D1 still receiving rows (`wrangler d1 execute baromontres --remote --command "SELECT COUNT(*) FROM article"`).
