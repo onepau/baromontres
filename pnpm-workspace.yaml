@@ -1,3 +1,18 @@
 packages:
   - apps/*
   - packages/*
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+
+overrides:
+  undici: ">=6.27.0"
+  ws: ">=8.21.0"
+  # Security floor is 6.4.3, but keep the major pinned: an unbounded ">=6.4.3"
+  # resolves to vite 8, which swaps in the rolldown bundler and breaks the
+  # manualChunks config in apps/web/vite.config.ts. ^6.4.3 stays on rollup-based
+  # vite 6 (matching apps/web's own devDependency range).
+  vite: "^6.4.3"
+  esbuild: ">=0.24.3"
