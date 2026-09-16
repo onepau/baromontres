@@ -58,13 +58,17 @@ jobs:
       - name: Smoke test
         run: |
           set -e
-          # Apex hub is live and indexable.
-          curl -sf https://tick-ticker.com/ > /dev/null
-          # Retired barometer API returns 410 Gone at the apex.
-          code=$(curl -s -o /dev/null -w '%{http_code}' https://tick-ticker.com/api/health)
+          # Test the hub on its workers.dev hostname, not the apex custom domain:
+          # the tick-ticker.com zone can serve a Cloudflare bot challenge to the
+          # runner IP (403), and workers.dev is not zone-protected. This still
+          # verifies the worker CI just deployed. Retry to ride out propagation.
+          HUB=https://tick-ticker-hub.onepau.workers.dev
+          curl -sf --retry 5 --retry-delay 3 --retry-all-errors "$HUB/" > /dev/null
+          # Retired barometer API returns 410 Gone.
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$HUB/api/health")
           if [ "$code" != "410" ]; then
-            echo "Expected 410 at apex /api/health, got $code"; exit 1
+            echo "Expected 410 at hub /api/health, got $code"; exit 1
           fi
           # Cron worker is healthy. (The barometer itself is behind Access and
           # cannot be smoke-tested without a service token.)
-          curl -sf https://baromontres-cron.onepau.workers.dev/ > /dev/null
+          curl -sf --retry 5 --retry-delay 3 --retry-all-errors https://baromontres-cron.onepau.workers.dev/ > /dev/null
