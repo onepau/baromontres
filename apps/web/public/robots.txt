@@ -1,4 +1,7 @@
+# The barometer app now runs only on its protected deployment (behind
+# Cloudflare Access), never on the public tick-ticker.com apex. Block all
+# crawling as belt-and-braces alongside Access and the X-Robots-Tag: noindex
+# header set in worker.ts. The public apex hub has its own robots.txt in
+# apps/hub. See docs/RETIRE_BAROMETER.md.
 User-agent: *
-Allow: /
-
-Sitemap: https://tick-ticker.com/sitemap.xml
+Disallow: /
