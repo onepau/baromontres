@@ -26,17 +26,18 @@
     <title>Tick ticker</title>
     <meta
       name="description"
-      content="Tick ticker follows fine watchmaking: price predictions for the Grand Prix d'Horlogerie de Genève and long-form writing on the industry."
+      content="Tick ticker follows the watch world: win-probability rankings for the Grand Prix d'Horlogerie de Genève and long-form writing on the industry."
     />
 
     <link rel="canonical" href="https://tick-ticker.com/" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Tick ticker" />
     <meta property="og:title" content="Tick ticker" />
     <meta
       property="og:description"
-      content="Grand Prix d'Horlogerie de Genève price predictions and long-form writing on watchmaking."
+      content="Win-probability rankings for the Grand Prix d'Horlogerie de Genève and long-form writing on the watch world."
     />
     <meta property="og:url" content="https://tick-ticker.com/" />
     <meta property="og:locale" content="en" />
@@ -51,7 +52,12 @@
     <style>
       /* Design system shared with gphg.tick-ticker.com: warm paper ground, blue ink
          accent, Fraunces headings, IBM Plex Sans body, Archivo labels. Tokens mirror the
-         GPHG index's :root so the two sites read as one family. */
+         GPHG index's :root so the two sites read as one family.
+
+         Mobile-first: the base rules are the phone layout — one column, masthead, hero,
+         then the two cards stacked. The single @media(min-width:900px) block is purely
+         additive: it widens the container and lays the hero and the cards out as two
+         columns, so a large desktop uses its width without changing the mobile view. */
       :root {
         color-scheme: light;
         --paper: #fcfbf8;
@@ -68,6 +74,7 @@
         --sans: "IBM Plex Sans", system-ui, sans-serif;
         --label: "Archivo", Arial, sans-serif;
         --maxw: 720px;
+        --gutter: 28px;
       }
       * {
         box-sizing: border-box;
@@ -77,6 +84,7 @@
         margin: 0;
       }
       body {
+        position: relative;
         background: var(--paper);
         color: var(--ink);
         font-family: var(--sans);
@@ -86,6 +94,27 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
+        overflow-x: hidden;
+      }
+      /* A large, very faint dial bleeding off the top-right corner — texture that fills
+         the desktop void without competing with the content. Hidden on small screens. */
+      .backdrop {
+        display: none;
+        position: absolute;
+        top: -140px;
+        right: -160px;
+        width: 620px;
+        height: 620px;
+        color: var(--accent);
+        opacity: 0.05;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .mast,
+      main,
+      footer {
+        position: relative;
+        z-index: 1;
       }
       h1,
       h2 {
@@ -102,7 +131,8 @@
 
       .mast {
         border-bottom: 1px solid var(--paper-line);
-        background: var(--paper);
+        background: color-mix(in srgb, var(--paper) 88%, transparent);
+        backdrop-filter: blur(6px);
       }
       .mast-in {
         display: flex;
@@ -110,7 +140,7 @@
         gap: 20px;
         max-width: var(--maxw);
         margin: 0 auto;
-        padding: 14px 28px;
+        padding: 14px var(--gutter);
       }
       .brandmark {
         display: flex;
@@ -135,38 +165,51 @@
         width: 100%;
         max-width: var(--maxw);
         margin: 0 auto;
-        padding: clamp(48px, 11vh, 120px) 28px 56px;
+        padding: clamp(44px, 10vh, 96px) var(--gutter) 56px;
       }
       .hero h1 {
-        font-size: clamp(30px, 4.6vw, 46px);
-        line-height: 1.04;
+        font-size: clamp(32px, 4.6vw, 54px);
+        line-height: 1.03;
       }
       .lede {
         color: var(--ink-soft);
         font-size: 17px;
         line-height: 1.5;
-        max-width: 42ch;
-        margin: 16px 0 40px;
+        max-width: 40ch;
+        margin: 18px 0 36px;
       }
 
       .cards {
         display: grid;
-        gap: 14px;
+        gap: 16px;
       }
       a.card {
         display: block;
         background: #fff;
         border: 1px solid var(--paper-line);
-        border-radius: 2px;
-        padding: 20px 22px;
+        border-radius: 3px;
+        padding: 22px 24px;
         color: var(--ink);
         transition:
           border-color 0.15s ease,
-          background 0.15s ease;
+          background 0.15s ease,
+          transform 0.15s ease;
       }
       a.card:hover {
         border-color: var(--accent-fill);
         background: var(--paper-hi);
+        transform: translateY(-2px);
+      }
+      .card-top {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        margin-bottom: 12px;
+      }
+      .motif {
+        width: 40px;
+        height: 26px;
+        flex: none;
       }
       .chip {
         font-family: var(--label);
@@ -175,22 +218,12 @@
         letter-spacing: 0.1em;
         text-transform: uppercase;
         color: var(--ink-faint);
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-      }
-      .chip::before {
-        content: "";
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: var(--accent-fill);
       }
       a.card .title {
         font-family: var(--serif);
         font-weight: 600;
-        font-size: 1.35rem;
-        margin: 8px 0 4px;
+        font-size: 1.5rem;
+        margin: 0 0 6px;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -207,7 +240,7 @@
       }
       a.card .desc {
         color: var(--ink-soft);
-        font-size: 0.95rem;
+        font-size: 0.97rem;
       }
 
       footer {
@@ -221,11 +254,59 @@
       footer .wrap {
         max-width: var(--maxw);
         margin: 0 auto;
-        padding: 20px 28px;
+        padding: 20px var(--gutter);
+      }
+
+      /* Desktop: additive only. Widen the shared container and turn the main area into a
+         two-column editorial split — hero on the left, cards on the right. */
+      @media (min-width: 900px) {
+        :root {
+          --maxw: 1080px;
+          --gutter: 40px;
+        }
+        .backdrop {
+          display: block;
+        }
+        main {
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+          gap: 64px;
+          align-items: center;
+          padding-top: clamp(72px, 15vh, 168px);
+          padding-bottom: 96px;
+        }
+        .hero {
+          align-self: center;
+        }
+        .lede {
+          margin-bottom: 0;
+          font-size: 18px;
+        }
       }
     </style>
   </head>
   <body>
+    <svg class="backdrop" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      <circle
+        cx="20"
+        cy="20"
+        r="18.5"
+        stroke="currentColor"
+        stroke-width="0.5"
+      />
+      <circle cx="20" cy="20" r="14" stroke="currentColor" stroke-width="0.5" />
+      <line
+        x1="20"
+        y1="20"
+        x2="30.5"
+        y2="9.5"
+        stroke="currentColor"
+        stroke-width="0.6"
+        stroke-linecap="round"
+      />
+      <circle cx="20" cy="20" r="1.4" fill="currentColor" />
+    </svg>
+
     <header class="mast">
       <div class="mast-in">
         <a class="brandmark" href="/" aria-label="Tick ticker home">
@@ -255,26 +336,88 @@
 
     <main id="main">
       <div class="hero">
-        <h1>Fine watchmaking, followed closely.</h1>
+        <h1>The watch world, in data and words.</h1>
         <p class="lede">
-          Price predictions for the Grand Prix d'Horlogerie de Genève, and
-          long-form writing on the watch industry.
+          Win-probability rankings for the Grand Prix d'Horlogerie de Genève,
+          plus long-form writing on the wider watch world.
         </p>
       </div>
 
       <nav class="cards" aria-label="Sections">
         <a class="card" href="https://gphg.tick-ticker.com" rel="noopener">
-          <span class="chip">Predictions</span>
+          <span class="card-top">
+            <svg class="motif" viewBox="0 0 40 26" aria-hidden="true">
+              <path
+                d="M4 23 A16 16 0 0 1 36 23"
+                fill="none"
+                stroke="var(--paper-line-strong)"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <path
+                d="M4 23 A16 16 0 0 1 25 7"
+                fill="none"
+                stroke="var(--accent)"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <line
+                x1="20"
+                y1="23"
+                x2="26"
+                y2="11"
+                stroke="var(--accent-deep)"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <circle cx="20" cy="23" r="2.3" fill="var(--accent-deep)" />
+            </svg>
+            <span class="chip">Predictions</span>
+          </span>
           <span class="title">GPHG Index</span>
           <span class="desc"
-            >Predictions and price tracking for the Grand Prix d'Horlogerie de
-            Genève.</span
+            >A statistical model's odds on who wins each prize at the Grand Prix
+            d'Horlogerie de Genève.</span
           >
         </a>
         <a class="card" href="https://blog.tick-ticker.com" rel="noopener">
-          <span class="chip">Journal</span>
+          <span class="card-top">
+            <svg class="motif" viewBox="0 0 40 26" aria-hidden="true">
+              <line
+                x1="4"
+                y1="7"
+                x2="36"
+                y2="7"
+                stroke="var(--paper-line-strong)"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <line
+                x1="4"
+                y1="14"
+                x2="36"
+                y2="14"
+                stroke="var(--paper-line-strong)"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <line
+                x1="4"
+                y1="21"
+                x2="22"
+                y2="21"
+                stroke="var(--accent)"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span class="chip">Journal</span>
+          </span>
           <span class="title">The Blog</span>
-          <span class="desc">Analysis and news from the watch industry.</span>
+          <span class="desc"
+            >Notes and analysis on watchmaking — from the grandes maisons to
+            microbrands.</span
+          >
         </a>
       </nav>
     </main>
