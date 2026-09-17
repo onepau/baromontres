@@ -1,68 +1,164 @@
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 import {
   getArticleDetail,
+  getArticlesByMonth,
   getBarometer,
+  getBrandLeaderboard,
   getFlaggedImages,
+  getImageDiagnostics,
   getKeywordFrequencies,
+  getPaywallStats,
+  getRecentImageAssessments,
+  getSentimentPanel,
+  getSourceBySlug,
   latestSubscriptionPrice,
-} from './queries.ts';
-import type { Env, KeywordKind } from './schema.ts';
+  listSources,
+} from "./queries.ts";
+import type { Env, KeywordKind, Lang } from "./schema.ts";
+
+const LANGS: ReadonlySet<string> = new Set(["fr", "en"]);
 
 const KEYWORD_KINDS: ReadonlySet<KeywordKind> = new Set([
-  'brand',
-  'topic',
-  'person',
-  'model',
+  "brand",
+  "topic",
+  "person",
+  "model",
 ]);
 
 export function createApi(): Hono<{ Bindings: Env }> {
   const app = new Hono<{ Bindings: Env }>();
 
-  app.use('*', cors({ origin: '*', allowMethods: ['GET'] }));
+  app.use("*", cors({ origin: "*", allowMethods: ["GET"] }));
 
-  app.get('/api/health', (c) => c.json({ ok: true }));
+  app.get("/api/health", (c) => c.json({ ok: true }));
 
-  app.get('/api/barometer', async (c) => {
-    const since = c.req.query('since') ?? undefined;
-    const limitParam = c.req.query('limit');
-    const limit = limitParam ? Math.min(5000, Math.max(1, Number(limitParam))) : undefined;
+  app.get("/api/barometer", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const limitParam = c.req.query("limit");
+    const limit = limitParam
+      ? Math.min(5000, Math.max(1, Number(limitParam)))
+      : undefined;
+    const langParam = c.req.query("lang");
+    const lang =
+      langParam && LANGS.has(langParam) ? (langParam as Lang) : undefined;
+    const sourceSlug = c.req.query("source") ?? undefined;
+    const sourceRow = sourceSlug
+      ? await getSourceBySlug(c.env.DB, sourceSlug)
+      : null;
+    const sourceId = sourceRow?.id;
     const [points, subscription] = await Promise.all([
-      getBarometer(c.env.DB, { since, limit }),
+      getBarometer(c.env.DB, { since, limit, lang, sourceId }),
       latestSubscriptionPrice(c.env.DB),
     ]);
+    c.header(
+      "Cache-Control",
+      "public, s-maxage=300, stale-while-revalidate=3600",
+    );
     return c.json({ points, subscription });
   });
 
-  app.get('/api/article/:id', async (c) => {
-    const id = Number(c.req.param('id'));
-    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400);
+  app.get("/api/article/:id", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isFinite(id)) return c.json({ error: "invalid id" }, 400);
     const detail = await getArticleDetail(c.env.DB, id);
-    if (!detail) return c.json({ error: 'not found' }, 404);
+    if (!detail) return c.json({ error: "not found" }, 404);
     return c.json(detail);
   });
 
-  app.get('/api/keywords', async (c) => {
-    const kindParam = c.req.query('kind');
-    const limitParam = c.req.query('limit');
-    const minCountParam = c.req.query('min_count');
+  app.get("/api/keywords", async (c) => {
+    const kindParam = c.req.query("kind");
+    const limitParam = c.req.query("limit");
+    const minCountParam = c.req.query("min_count");
     const kind =
       kindParam && KEYWORD_KINDS.has(kindParam as KeywordKind)
         ? (kindParam as KeywordKind)
         : undefined;
-    const limit = limitParam ? Math.min(500, Math.max(1, Number(limitParam))) : undefined;
+    const limit = limitParam
+      ? Math.min(500, Math.max(1, Number(limitParam)))
+      : undefined;
     const min_count = minCountParam
       ? Math.min(50, Math.max(1, Number(minCountParam) || 1))
       : undefined;
-    const frequencies = await getKeywordFrequencies(c.env.DB, { kind, limit, min_count });
+    const frequencies = await getKeywordFrequencies(c.env.DB, {
+      kind,
+      limit,
+      min_count,
+    });
     return c.json({ frequencies });
   });
 
-  app.get('/api/images/flagged', async (c) => {
-    const limitParam = c.req.query('limit');
-    const limit = limitParam ? Math.min(50, Math.max(1, Number(limitParam) || 12)) : undefined;
+  app.get("/api/images/flagged", async (c) => {
+    const limitParam = c.req.query("limit");
+    const limit = limitParam
+      ? Math.min(50, Math.max(1, Number(limitParam) || 12))
+      : undefined;
     const flags = await getFlaggedImages(c.env.DB, { limit });
     return c.json({ flags });
+  });
+
+  app.get("/api/diag/images", async (c) => {
+    const diag = await getImageDiagnostics(c.env.DB);
+    return c.json(diag);
+  });
+
+  app.get("/api/diag/images/recent", async (c) => {
+    const limitParam = c.req.query("limit");
+    const limit = limitParam
+      ? Math.min(50, Math.max(1, Number(limitParam) || 5))
+      : 5;
+    const rows = await getRecentImageAssessments(c.env.DB, limit);
+    return c.json({ rows });
+  });
+
+  app.get("/api/diag/articles_by_month", async (c) => {
+    const months = await getArticlesByMonth(c.env.DB);
+    return c.json({ months });
+  });
+
+  app.get("/api/paywall", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const stats = await getPaywallStats(c.env.DB, { since });
+    return c.json(stats);
+  });
+
+  app.get("/api/brands", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const limitParam = c.req.query("limit");
+    const minCountParam = c.req.query("min_count");
+    const limit = limitParam
+      ? Math.min(100, Math.max(1, Number(limitParam)))
+      : undefined;
+    const min_count = minCountParam
+      ? Math.min(50, Math.max(1, Number(minCountParam) || 3))
+      : undefined;
+    const langParam = c.req.query("lang");
+    const lang =
+      langParam && LANGS.has(langParam) ? (langParam as Lang) : undefined;
+    const sourceSlug = c.req.query("source") ?? undefined;
+    const sourceRow = sourceSlug
+      ? await getSourceBySlug(c.env.DB, sourceSlug)
+      : null;
+    const sourceId = sourceRow?.id;
+    const brands = await getBrandLeaderboard(c.env.DB, {
+      since,
+      limit,
+      min_count,
+      lang,
+      sourceId,
+    });
+    return c.json({ brands });
+  });
+
+  app.get("/api/sources", async (c) => {
+    const sources = await listSources(c.env.DB, { activeOnly: true });
+    return c.json({ sources });
+  });
+
+  app.get("/api/sentiment/panel", async (c) => {
+    const since = c.req.query("since") ?? undefined;
+    const panel = await getSentimentPanel(c.env.DB, { since });
+    return c.json(panel);
   });
 
   return app;

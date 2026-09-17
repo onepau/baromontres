@@ -1,12 +1,27 @@
-export type SentimentLabel = 'positive' | 'neutral' | 'negative';
-export type KeywordKind = 'brand' | 'topic' | 'person' | 'model';
-export type SubscriptionPeriod = 'monthly' | 'yearly';
+export type SentimentLabel = "positive" | "neutral" | "negative";
+export type KeywordKind = "brand" | "topic" | "person" | "model";
+export type SubscriptionPeriod = "monthly" | "yearly";
+export type Lang = "fr" | "en";
+
+export interface SourceRow {
+  id: number;
+  slug: string;
+  name: string;
+  lang: Lang;
+  home_url: string;
+  feed_url: string | null;
+  is_paywalled_default: 0 | 1;
+  weight: number;
+  active: 0 | 1;
+  created_at: string;
+}
 
 export interface ArticleRow {
   id: number;
   url: string;
   title: string;
   published_at: string;
+  source_id: number | null;
   is_paywalled: 0 | 1;
   unit_price_chf: number | null;
   preview_text: string | null;
@@ -38,6 +53,9 @@ export interface ImageAnalysisRow {
   is_hero: 0 | 1;
   pop_culture_source: string | null;
   ai_generated_likelihood: number | null;
+  not_watch_image: 0 | 1 | null;
+  has_text_overlay: 0 | 1 | null;
+  source_clue: string | null;
   notes: string | null;
 }
 
@@ -57,15 +75,20 @@ export interface BarometerPoint {
   sentiment_label: SentimentLabel | null;
   sentiment_score: number | null;
   hero_image_url: string | null;
+  source_id: number | null;
+  source_slug: string | null;
+  source_lang: Lang | null;
 }
 
 export interface ArticleDetail extends ArticleRow {
   keywords: KeywordRow[];
   sentiment: SentimentRow | null;
   images: ImageAnalysisRow[];
+  source: SourceRow | null;
 }
 
 export interface Env {
   DB: D1Database;
   ANTHROPIC_API_KEY: string;
+  GOOGLE_VISION_API_KEY: string;
 }

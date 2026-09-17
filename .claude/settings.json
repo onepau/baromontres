@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://www.businessmontres.com/*)",
+      "Bash(curl -s -L \"https://www.businessmontres.com/*)",
+      "Bash(curl -s -o /dev/null -w *)",
+      "Bash(curl -i \"https://www.businessmontres.com/*)",
+      "Bash(pnpm --filter @baromontres/cron exec tsc --noEmit*)",
+      "Bash(pnpm --filter @baromontres/cron run build*)",
+      "Bash(pnpm --filter @baromontres/web run build*)",
+      "Bash(pnpm exec tsc --noEmit*)",
+      "Bash(pnpm --filter @baromontres/cron test*)",
+      "Bash(pnpm test*)"
+    ]
+  }
+}
