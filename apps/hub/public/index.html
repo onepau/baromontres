@@ -4,6 +4,11 @@
     <!-- Google Analytics 4, served first-party via Cloudflare's Google tag gateway: the
          loader comes from /analytics on this origin, not googletagmanager.com. The config
          lives in /ga4.js. Carried over from the retired barometer apex. -->
+    <!-- Cookie consent, shared by every tick-ticker host (canonical copy in the GPHG repo,
+         worker/src/assets/consent.js). Must stay first: Consent Mode's default has to be
+         queued before gtag('config') in /ga4.js, and Clarity reads its consent from the
+         stub this sets up. -->
+    <script src="/consent.js"></script>
     <script async src="/analytics/gtag/js?id=G-9ZCDZDCE1P"></script>
     <script src="/ga4.js"></script>
     <!-- Microsoft Clarity -->
@@ -251,6 +256,19 @@
         font-size: 12px;
         letter-spacing: 0.03em;
       }
+      footer a,
+      .linkbtn {
+        color: inherit;
+        text-decoration: underline;
+      }
+      .linkbtn {
+        font: inherit;
+        letter-spacing: inherit;
+        background: none;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+      }
       footer .wrap {
         max-width: var(--maxw);
         margin: 0 auto;
@@ -423,7 +441,10 @@
     </main>
 
     <footer>
-      <div class="wrap">© Tick ticker</div>
+      <div class="wrap">
+        © Tick ticker · <a href="/privacy">Privacy</a> ·
+        <button type="button" class="linkbtn" data-tt-consent>Cookie settings</button>
+      </div>
     </footer>
   </body>
 </html>
