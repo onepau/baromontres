@@ -31,7 +31,7 @@
     <title>Tick ticker</title>
     <meta
       name="description"
-      content="Tick ticker follows the watch world: win-probability rankings for the Grand Prix d'Horlogerie de Genève and long-form writing on the industry."
+      content="Tick ticker follows the watch world: win-probability rankings for the Grand Prix d'Horlogerie de Genève, every Only Watch auction result, and long-form writing on the industry."
     />
 
     <link rel="canonical" href="https://tick-ticker.com/" />
@@ -42,11 +42,42 @@
     <meta property="og:title" content="Tick ticker" />
     <meta
       property="og:description"
-      content="Win-probability rankings for the Grand Prix d'Horlogerie de Genève and long-form writing on the watch world."
+      content="Win-probability rankings for the Grand Prix d'Horlogerie de Genève, every Only Watch auction result, and long-form writing on the watch world."
     />
     <meta property="og:url" content="https://tick-ticker.com/" />
     <meta property="og:locale" content="en" />
 
+    <!-- One publisher, one site family. The @ids are shared with the sub-sites'
+         JSON-LD (onlywatch. declares isPartOf https://tick-ticker.com/#website and
+         publisher https://tick-ticker.com/#organization), so the hosts resolve to one graph. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://tick-ticker.com/#organization",
+            "name": "Tick ticker",
+            "url": "https://tick-ticker.com/",
+            "logo": "https://tick-ticker.com/favicon.svg"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://tick-ticker.com/#website",
+            "name": "Tick ticker",
+            "url": "https://tick-ticker.com/",
+            "inLanguage": "en",
+            "publisher": { "@id": "https://tick-ticker.com/#organization" },
+            "hasPart": [
+              { "@type": "WebSite", "name": "GPHG Index", "url": "https://gphg.tick-ticker.com/" },
+              { "@type": "WebSite", "@id": "https://onlywatch.tick-ticker.com/#website", "name": "Only Watch Index", "url": "https://onlywatch.tick-ticker.com/" },
+              { "@type": "Blog", "name": "The Blog", "url": "https://blog.tick-ticker.com/" },
+              { "@type": "WebSite", "name": "Watches on Social", "url": "https://social.tick-ticker.com/" }
+            ]
+          }
+        ]
+      }
+    </script>
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -357,7 +388,8 @@
         <h1>The watch world, in data and words.</h1>
         <p class="lede">
           Win-probability rankings for the Grand Prix d'Horlogerie de Genève,
-          plus long-form writing on the wider watch world.
+          every Only Watch auction result, and long-form writing on the wider
+          watch world.
         </p>
       </div>
 
@@ -396,6 +428,63 @@
           <span class="desc"
             >A statistical model's odds on who wins each prize at the Grand Prix
             d'Horlogerie de Genève.</span
+          >
+        </a>
+        <a class="card" href="https://onlywatch.tick-ticker.com" rel="noopener">
+          <span class="card-top">
+            <svg class="motif" viewBox="0 0 40 26" aria-hidden="true">
+              <line
+                x1="4"
+                y1="23"
+                x2="36"
+                y2="23"
+                stroke="var(--paper-line-strong)"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="9"
+                y1="23"
+                x2="9"
+                y2="17"
+                stroke="var(--paper-line-strong)"
+                stroke-width="4"
+                stroke-linecap="round"
+              />
+              <line
+                x1="17"
+                y1="23"
+                x2="17"
+                y2="13"
+                stroke="var(--accent)"
+                stroke-width="4"
+                stroke-linecap="round"
+              />
+              <line
+                x1="25"
+                y1="23"
+                x2="25"
+                y2="5"
+                stroke="var(--accent-deep)"
+                stroke-width="4"
+                stroke-linecap="round"
+              />
+              <line
+                x1="33"
+                y1="23"
+                x2="33"
+                y2="11"
+                stroke="var(--accent)"
+                stroke-width="4"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span class="chip">Auction data</span>
+          </span>
+          <span class="title">Only Watch Index</span>
+          <span class="desc"
+            >Every lot, estimate and hammer price from the Only Watch charity
+            auctions, 2005–2024.</span
           >
         </a>
         <a class="card" href="https://blog.tick-ticker.com" rel="noopener">
