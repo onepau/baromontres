@@ -25,13 +25,29 @@ Never run `wrangler deploy` at the root without rebuilding first.
 
 ## After every deploy
 
-**Web worker** — curl these three endpoints; all must return HTTP 200 with non-empty JSON:
+**Web worker** — these three endpoints must return HTTP 200 with non-empty JSON:
+
+```
+https://app.tick-ticker.com/api/health
+https://app.tick-ticker.com/api/barometer?limit=1
+https://app.tick-ticker.com/api/images/flagged
+```
+
+The barometer is served only on `app.tick-ticker.com`, behind Cloudflare Access.
+`workers_dev = false` (commit `e2ab2b3`), so `baromontres.onepau.workers.dev` returns
+Cloudflare error 1042 by design; do not use it for checks. A plain `curl` gets a 302 to
+the Access login, which is not a pass. Either open the three URLs in a browser that is
+signed in through Access, or, if an Access service token exists, pass it:
 
 ```bash
-curl -sf https://baromontres.onepau.workers.dev/api/health
-curl -sf "https://baromontres.onepau.workers.dev/api/barometer?limit=1"
-curl -sf https://baromontres.onepau.workers.dev/api/images/flagged
+H=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+curl -sf "${H[@]}" https://app.tick-ticker.com/api/health
+curl -sf "${H[@]}" "https://app.tick-ticker.com/api/barometer?limit=1"
+curl -sf "${H[@]}" https://app.tick-ticker.com/api/images/flagged
 ```
+
+If neither is available to you (e.g. an agent session), say so and ask the owner to run
+the browser check before pushing — do not treat the 302 or the 1042 as a result.
 
 **Cron worker** — must return 200:
 
