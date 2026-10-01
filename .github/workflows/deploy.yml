@@ -13,32 +13,62 @@ jobs:
       deployments: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v2
+      # pnpm 11 to match the lockfile: `overrides` and build-script approvals
+      # (allowBuilds) live in pnpm-workspace.yaml, which only pnpm >= 10.4 reads.
+      # pnpm 9 ignored them and frozen install failed with a lockfile-config mismatch.
+      - uses: pnpm/action-setup@v6
         with:
-          version: 9
+          version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm test
-        continue-on-error: true
 
       - run: pnpm build
 
-      - name: Deploy web to Cloudflare Pages
+      # Apex hub (tick-ticker.com). The custom domain is bound to this worker in
+      # the Cloudflare dashboard; deploying updates the version it serves.
+      - name: Deploy apex hub
+        run: pnpm deploy:hub
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Barometer worker — private, served only via app.tick-ticker.com behind
+      # Cloudflare Access (workers_dev disabled). Deploy updates the version.
+      - name: Deploy barometer worker
         run: pnpm deploy:web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy cron to Cloudflare Workers
+      - name: Deploy cron worker
         run: pnpm deploy:cron
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test
+        run: |
+          set -e
+          # Test the hub on its workers.dev hostname, not the apex custom domain:
+          # the tick-ticker.com zone can serve a Cloudflare bot challenge to the
+          # runner IP (403), and workers.dev is not zone-protected. This still
+          # verifies the worker CI just deployed. Retry to ride out propagation.
+          HUB=https://tick-ticker-hub.onepau.workers.dev
+          curl -sf --retry 5 --retry-delay 3 --retry-all-errors "$HUB/" > /dev/null
+          # Retired barometer API returns 410 Gone.
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$HUB/api/health")
+          if [ "$code" != "410" ]; then
+            echo "Expected 410 at hub /api/health, got $code"; exit 1
+          fi
+          # Cron worker is healthy. (The barometer itself is behind Access and
+          # cannot be smoke-tested without a service token.)
+          curl -sf --retry 5 --retry-delay 3 --retry-all-errors https://baromontres-cron.onepau.workers.dev/ > /dev/null

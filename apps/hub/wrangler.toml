@@ -1,0 +1,29 @@
+name = "tick-ticker-hub"
+main = "src/worker.ts"
+compatibility_date = "2024-11-12"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# Apex custom domain — DISABLED until cutover.
+#
+# A hostname binds to exactly one Worker. `tick-ticker.com` is currently bound to
+# the `baromontres` web worker (in the Cloudflare dashboard, not in that worker's
+# wrangler.toml). Deploying this worker with the route below enabled would fail
+# until the binding is removed from `baromontres` first.
+#
+# CUTOVER (do not run without confirming — see docs/RETIRE_BAROMETER.md):
+#   1. Deploy this worker to its workers.dev host and verify the hub + 410s.
+#   2. In the dashboard, remove the tick-ticker.com custom domain from `baromontres`.
+#   3. Uncomment the route below and `wrangler deploy` this worker to claim the apex.
+#   4. Deploy the now-protected `baromontres` barometer (noindex + Access).
+#
+# routes = [
+#   { pattern = "tick-ticker.com", custom_domain = true }
+# ]
+
+[observability]
+[observability.logs]
+enabled = true

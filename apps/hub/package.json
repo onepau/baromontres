@@ -1,0 +1,16 @@
+{
+  "name": "@baromontres/hub",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "echo \"hub: static assets, no build step\"",
+    "deploy": "wrangler deploy",
+    "test": "echo \"hub: no tests\""
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "wrangler": "^3.95.0"
+  }
+}

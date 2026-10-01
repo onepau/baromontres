@@ -1,0 +1,33 @@
+# Tick ticker
+
+> Price and sentiment barometer of the French-language watch press, updated daily.
+
+Tick ticker scrapes businessmontres.com daily to measure the unit price of paywalled articles, editorial sentiment, and the watch brands they mention. It gives horology readers a quick read on what drives the specialist French-language press — from the cost of a single dossier to brand coverage rankings, paywall economics, and a classifier that flags doctored or AI-generated hero images.
+
+The site is available in French (default) and English.
+
+## Public JSON API
+
+All endpoints return JSON and require no authentication.
+
+- [GET /api/barometer](https://tick-ticker.com/api/barometer): Time-series of articles with price, sentiment, date, paywall flag, and source. Query params: `since` (ISO date), `limit` (max 5000), `lang` (fr|en), `source` (slug).
+- [GET /api/article/:id](https://tick-ticker.com/api/article/1): Full detail for a single article — title, body excerpt, sentiment rationale, keywords, image analysis.
+- [GET /api/keywords](https://tick-ticker.com/api/keywords): Keyword frequency table. Query params: `kind` (brand|topic|person|model), `limit`, `min_count`.
+- [GET /api/brands](https://tick-ticker.com/api/brands): Brand leaderboard with coverage count, positive and negative sentiment counts. Query params: `since`, `limit`, `min_count`, `lang`, `source`.
+- [GET /api/paywall](https://tick-ticker.com/api/paywall): Cumulative paywall cost vs subscription price for a given period. Query param: `since`.
+- [GET /api/images/flagged](https://tick-ticker.com/api/images/flagged): Articles whose hero image was classified as AI-generated, doctored (cartoon/pop-culture), off-topic, or carrying an added text overlay. Query param: `limit` (max 50).
+- [GET /api/sources](https://tick-ticker.com/api/sources): List of active scraped publications.
+- [GET /api/health](https://tick-ticker.com/api/health): Health check — returns `{"ok":true}`.
+
+## Data pipeline
+
+Articles are discovered and scraped from businessmontres.com. Each article is enriched by Claude Haiku (Anthropic) for sentiment (positive/neutral/negative) and keyword extraction (brands, topics, persons, watch models). Hero images are assessed first by Google Vision WEB_DETECTION, with Claude Haiku as fallback, to detect non-watch imagery, AI generation, and text overlays. Enrichment runs daily at 04:17 UTC via a Cloudflare cron Worker.
+
+## Coverage
+
+- Source: businessmontres.com (French-language watch journalism)
+- Language: French articles, bilingual interface (FR/EN)
+- Update cadence: daily
+- Sentiment labels: positive, neutral, negative
+- Keyword kinds: brand, topic, person, model
+- Image flags: ai_generated, not_watch_image, has_text_overlay

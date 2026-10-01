@@ -10,3 +10,4 @@ dist
 coverage
 .vscode
 .idea
+.ipynb_checkpoints
